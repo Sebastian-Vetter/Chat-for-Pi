@@ -49,12 +49,24 @@ Follow the Run section below from this repository. Chat uses the Pi configuratio
 
 ## Run
 
-Use Node.js 22.19 or newer. Run commands from this directory:
+Use Node.js 22.19 or newer. For a fresh checkout:
 
 ```sh
+git clone --branch dev https://github.com/Sebastian-Vetter/Chat-for-Pi.git
+cd Chat-for-Pi
 npm install
 npm run dev
 ```
+
+To update an existing checkout, run from its repository directory:
+
+```sh
+git switch dev
+git pull --ff-only origin dev
+npm install
+```
+
+Keep any local changes safe before switching branches or pulling. `--ff-only` refuses divergent history instead of creating an unexpected merge. After updating, restart your development server, or run `npm run build` before starting the production server. If you use the background service, run `npm run server:restart` to rebuild and reload it; this interrupts active runs.
 
 Open **http://127.0.0.1:5173**. The API runs on port 3001. Both servers bind only to loopback.
 

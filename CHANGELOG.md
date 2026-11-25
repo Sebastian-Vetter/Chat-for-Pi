@@ -4,6 +4,12 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-25
+
+### Documentation
+
+- Added the repository's exact clone URL, explicit `dev` branch checkout, and fast-forward-only pull instructions, with dependency installation and restart guidance.
+
 ## [1.0.2] - 2026-11-25
 
 ### Added
