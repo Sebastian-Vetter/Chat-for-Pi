@@ -3,6 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatRecord, ChatStore } from './store.js';
 import { conversationInstructions } from './instructions.js';
+import { ActivityLog } from './activity.js';
 
 export interface DisplayMessage { role: string; text: string; toolName?: string; isError?: boolean }
 export function displayMessages(messages: readonly unknown[], streamingMessage?: unknown): DisplayMessage[] {
@@ -22,7 +23,7 @@ export class AgentService {
   private listeners = new Map<string, Set<(event: unknown) => void>>();
   private errors = new Map<string, string>();
   private tools = new Map<string, string>();
-  constructor(private store: ChatStore) {}
+  constructor(private store: ChatStore, readonly activity = new ActivityLog(join(store.directory, 'activity'))) {}
   busy(id: string) { return this.running.has(id); }
   instructions(record: ChatRecord) {
     return conversationInstructions(record.cwd, this.sessions.get(record.id)?.resourceLoader.getAgentsFiles().agentsFiles);
@@ -30,13 +31,13 @@ export class AgentService {
   snapshot(record: ChatRecord) {
     const session = this.sessions.get(record.id);
     const messages = session?.messages ?? (record.sessionFile && existsSync(record.sessionFile) ? SessionManager.open(record.sessionFile).buildSessionContext().messages : []);
-    return { chat: record, messages: displayMessages(messages, session?.state.streamingMessage), busy: this.busy(record.id), tool: this.tools.get(record.id), error: this.errors.get(record.id), model: session?.model ? `${session.model.provider}/${session.model.id}` : undefined };
+    return { chat: record, events: this.activity.list(record.id), messages: displayMessages(messages, session?.state.streamingMessage), busy: this.busy(record.id), tool: this.tools.get(record.id), error: this.errors.get(record.id), model: session?.model ? `${session.model.provider}/${session.model.id}` : undefined };
   }
   subscribe(id: string, fn: (event: unknown) => void) {
     const group = this.listeners.get(id) ?? new Set(); group.add(fn); this.listeners.set(id, group);
     return () => { group.delete(fn); if (!group.size) this.listeners.delete(id); };
   }
-  private publish(record: ChatRecord) { const snapshot = this.snapshot(record); this.listeners.get(record.id)?.forEach(fn => fn(snapshot)); }
+  publish(record: ChatRecord) { const snapshot = this.snapshot(record); this.listeners.get(record.id)?.forEach(fn => fn(snapshot)); }
   private async session(record: ChatRecord): Promise<AgentSession> {
     const cached = this.sessions.get(record.id); if (cached) return cached;
     const pending = this.loading.get(record.id); if (pending) return pending;
@@ -55,14 +56,26 @@ export class AgentService {
     this.sessions.set(record.id, session);
     if (session.sessionFile) this.store.update(record.id, { sessionFile: session.sessionFile });
     session.subscribe(event => {
-      if (event.type === 'tool_execution_start') this.tools.set(record.id, event.toolName);
-      if (event.type === 'tool_execution_end') this.tools.delete(record.id);
+      if (event.type === 'tool_execution_start') {
+        this.tools.set(record.id, event.toolName);
+        const args = event.args as Record<string, unknown>;
+        this.activity.start(record.id, 'tool', event.toolName, JSON.stringify(args, null, 2), `${session.sessionId}:${event.toolCallId}`);
+      }
+      if (event.type === 'tool_execution_end') {
+        this.tools.delete(record.id);
+        this.activity.update(record.id, `${session.sessionId}:${event.toolCallId}`, { status: event.isError ? 'failed' : 'passed', durationMs: event.durationMs });
+      }
+      if (event.type === 'message_end' && event.message.role === 'assistant') {
+        const id = this.activity.start(record.id, 'agent', 'Assistant response', displayMessages([event.message]).map(m => m.text).join('\n'));
+        this.activity.update(record.id, id, { status: event.message.stopReason === 'aborted' ? 'stopped' : event.message.errorMessage ? 'failed' : 'passed' });
+      }
       this.publish(record);
     });
     return session;
   }
   async prompt(record: ChatRecord, text: string, modelKey?: string) {
     if (this.busy(record.id)) throw new Error('This chat is already running');
+    const runId = this.activity.start(record.id, 'agent', 'Pi coding run', text);
     this.running.add(record.id); this.errors.delete(record.id); this.publish(record);
     try {
       const session = await this.session(record);
@@ -74,7 +87,10 @@ export class AgentService {
       }
       if (record.title === 'New chat') this.store.update(record.id, { title: text.replace(/\s+/g, ' ').slice(0, 70) });
       await session.prompt(text);
+      const last = session.messages.findLast(message => message.role === 'assistant');
+      this.activity.update(record.id, runId, { status: last?.role === 'assistant' && last.stopReason === 'aborted' ? 'stopped' : last?.role === 'assistant' && last.errorMessage ? 'failed' : 'passed' });
     } catch (error) {
+      this.activity.update(record.id, runId, { status: 'failed' });
       this.errors.set(record.id, error instanceof Error ? error.message : String(error));
     } finally {
       this.running.delete(record.id); this.tools.delete(record.id);

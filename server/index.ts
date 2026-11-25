@@ -5,12 +5,15 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { ChatStore } from './store.js';
 import { AgentService } from './agent.js';
+import { changes, fileDiff } from './git.js';
+import { discoverTasks, PipelineService } from './pipelines.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 const dataDir = resolve(process.env.CHAT_DATA_DIR ?? '.data');
 const store = new ChatStore(dataDir);
 const agents = new AgentService(store);
+const pipelines = new PipelineService(agents.activity, record => agents.publish(record));
 const allowed = new Set([`127.0.0.1:${port}`, `localhost:${port}`, '127.0.0.1:5173', 'localhost:5173']);
 app.use((req, res, next) => {
   if (!allowed.has(req.headers.host ?? '')) { res.status(403).json({ error: 'Local access only' }); return; }
@@ -45,6 +48,22 @@ app.param('id', (req, res, next, id) => {
 });
 app.get('/api/chats/:id', (req, res) => res.json(agents.snapshot(store.get(req.params.id)!)));
 app.get('/api/chats/:id/instructions', (req, res) => res.json(agents.instructions(store.get(req.params.id)!)));
+app.get('/api/chats/:id/changes', async (req, res) => res.json(await changes(store.get(req.params.id)!.cwd)));
+app.get('/api/chats/:id/diff', async (req, res) => {
+  if (typeof req.query.path !== 'string') { res.status(400).json({ error: 'A changed file path is required' }); return; }
+  res.json(await fileDiff(store.get(req.params.id)!.cwd, req.query.path, req.query.full === '1'));
+});
+app.get('/api/chats/:id/tests', async (req, res) => {
+  const record = store.get(req.params.id)!;
+  const tasks = (await discoverTasks(record.cwd)).map(({ id, name, command }) => ({ id, name, command }));
+  res.json({ tasks, running: pipelines.busy(record.id), runs: agents.activity.list(record.id).filter(e => e.type === 'test') });
+});
+app.post('/api/chats/:id/tests', async (req, res) => {
+  if (typeof req.body?.taskId !== 'string') { res.status(400).json({ error: 'A configured task ID is required' }); return; }
+  try { const id = await pipelines.start(store.get(req.params.id)!, req.body.taskId); res.status(202).json({ id }); }
+  catch (error) { res.status(409).json({ error: (error as Error).message }); }
+});
+app.post('/api/chats/:id/tests/stop', async (req, res) => { await pipelines.stop(req.params.id); res.json({ ok: true }); });
 app.patch('/api/chats/:id', (req, res) => {
   const title = req.body?.title;
   if (typeof title !== 'string' || !title.trim() || title.length > 120) { res.status(400).json({ error: 'Title must be 1–120 characters' }); return; }
@@ -52,10 +71,10 @@ app.patch('/api/chats/:id', (req, res) => {
 });
 app.delete('/api/chats/:id', async (req, res) => {
   const id = req.params.id;
-  if (agents.busy(id)) { res.status(409).json({ error: 'Stop this chat before deleting it' }); return; }
+  if (agents.busy(id) || pipelines.busy(id)) { res.status(409).json({ error: 'Stop this chat and its tests before deleting it' }); return; }
   agents.dispose(id);
   await rm(join(dataDir, 'sessions', id), { recursive: true, force: true });
-  store.delete(id); res.json({ ok: true });
+  agents.activity.delete(id); store.delete(id); res.json({ ok: true });
 });
 app.get('/api/chats/:id/events', (req, res) => {
   const record = store.get(req.params.id)!;
@@ -96,7 +115,7 @@ const server = app.listen(port, '127.0.0.1', () => console.log(`Pi Chat API: htt
 let closing = false;
 async function shutdown() {
   if (closing) return; closing = true;
-  server.close(); await agents.shutdown(); server.closeAllConnections(); process.exit(0);
+  server.close(); await Promise.all([agents.shutdown(), pipelines.shutdown()]); server.closeAllConnections(); process.exit(0);
 }
 process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
