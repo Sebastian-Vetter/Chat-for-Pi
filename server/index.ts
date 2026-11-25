@@ -17,7 +17,8 @@ const agents = new AgentService(store);
 const pipelines = new PipelineService(agents.activity, record => agents.publish(record));
 const piSessions = new PiSessions(store);
 const appVersion: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
-const allowed = new Set([`127.0.0.1:${port}`, `localhost:${port}`, '127.0.0.1:5173', 'localhost:5173']);
+const webPort = Number(process.env.CHAT_WEB_PORT ?? 5173);
+const allowed = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `127.0.0.1:${webPort}`, `localhost:${webPort}`]);
 app.use((req, res, next) => {
   if (!allowed.has(req.headers.host ?? '')) { res.status(403).json({ error: 'Local access only' }); return; }
   const origin = req.headers.origin;
