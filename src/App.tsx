@@ -11,6 +11,7 @@ import { ContextMeter, PromptQueue } from './SessionStatus';
 import ThinkingPanel from './ThinkingPanel';
 import Commands from './Commands';
 import Subagents from './Subagents';
+import Updates from './Updates';
 import './commands.css';
 import { version as appVersion } from '../package.json';
 
@@ -48,6 +49,7 @@ export default function App() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [updatesOpen, setUpdatesOpen] = useState(false);
   const [piSessionsOpen, setPiSessionsOpen] = useState(false);
   const [preferences, setPreferences] = useState(readPreferences);
   const [soundNotice, setSoundNotice] = useState('');
@@ -180,6 +182,7 @@ export default function App() {
     </aside></>}
     <main className="main-panel">
       <header className="topbar"><div className="topbar-left">{!sidebar && <button className="icon-button" aria-label="Open sidebar" onClick={() => setSidebar(true)}><Menu size={20} /></button>}<span className="page-title">{currentChat?.title ?? 'New conversation'}</span><span className="subtle-pill">Pi agent</span></div><button className="workspace-button" onClick={() => setWorkspaceOpen(true)} title={currentChat?.cwd ?? cwd}><Folder size={14} /><span>{(currentChat?.cwd ?? cwd).split('/').filter(Boolean).at(-1) || 'Workspace'}</span><ChevronDown size={13} /></button><button className={`workspace-tools-button ${inspectorOpen ? 'selected' : ''}`} aria-label="Toggle workspace tools" aria-expanded={inspectorOpen} onClick={() => setInspectorOpen(!inspectorOpen)}><Code2 size={16} /><span>Tools</span></button></header>
+      <Updates open={updatesOpen} show={() => setUpdatesOpen(true)} close={() => setUpdatesOpen(false)} />
       <PromptQueue snapshot={snapshot} onError={setError} />
       <div className="conversation-scroll" ref={scroll} onScroll={() => { const el = scroll.current; if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>
         {!messages.length && !loading && !busy ? <section className="welcome"><div className="welcome-label"><span />YOUR IDEAS. YOUR WORKSPACE.</div><div className="welcome-logo">π<span /></div><h1>What will we build<span>today?</span></h1><p>A conversation away from your next idea.<br />Write, explore, and build with Pi in your own workspace.</p><div className="starters">{starters.map(item => <button key={item.title} onClick={() => { setDraft(item.text); textarea.current?.focus(); }}><item.icon size={20} /><strong>{item.title}</strong><span>{item.text}</span><span className="starter-arrow">↗</span></button>)}</div><div className="welcome-note"><Folder size={13} />Working in <button onClick={() => setWorkspaceOpen(true)}>{(currentChat?.cwd ?? cwd).replace(/^\/Users\/[^/]+/, '~') || 'your workspace'}</button></div></section> : <section className="transcript" aria-label="Chat messages">{loading && <div className="status-line"><LoaderCircle size={16} className="spin" />Loading conversation…</div>}{messages.map((message, index) => <MessageView key={index} message={message} />)}<ThinkingPanel snapshot={snapshot} /></section>}
@@ -194,7 +197,7 @@ export default function App() {
     </main>
     {inspectorOpen && <Inspector chatId={active} events={snapshot?.events ?? []} close={() => setInspectorOpen(false)} />}
     {commandsOpen && <Commands close={() => setCommandsOpen(false)} choose={command => { setDraft(command); setCommandsOpen(false); textarea.current?.focus(); }} />}
-    {settingsOpen && <SettingsDialog value={preferences} version={appVersion} save={next => { setPreferences(next); setSoundNotice(''); }} close={() => setSettingsOpen(false)} />}
+    {settingsOpen && <SettingsDialog value={preferences} version={appVersion} updates={() => { setSettingsOpen(false); setUpdatesOpen(true); }} save={next => { setPreferences(next); setSoundNotice(''); }} close={() => setSettingsOpen(false)} />}
     {piSessionsOpen && <PiSessionBrowser close={() => setPiSessionsOpen(false)} imported={chat => { setChats(current => [chat, ...current]); selectChat(chat.id); setPiSessionsOpen(false); if (window.innerWidth <= 760) setSidebar(false); }} />}
     {workspaceOpen && <WorkspaceDialog value={currentChat?.cwd ?? cwd} locked={!!active} close={() => setWorkspaceOpen(false)} save={value => { setCwd(value); setWorkspaceOpen(false); }} />}
     <KeyboardShortcut action={newChat} />

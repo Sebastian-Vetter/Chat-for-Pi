@@ -11,7 +11,7 @@ export interface CommandResult { code: number; stdout: string; stderr: string }
 export type Run = (command: string, args: string[], cwd?: string) => Promise<CommandResult>;
 interface Health { app: string; serviceId?: string | null; pid: number }
 export interface ServiceConfig {
-  root: string; node: string; home: string; uid: number; label: string; target: string;
+  root: string; node: string; home: string; uid: number; label: string; target: string; dataDir?: string; workspace?: string;
   plist: string; logDir: string; url: string; port: number;
 }
 export function serviceConfig(root: string, home = homedir(), node = process.execPath, uid = process.getuid?.() ?? -1): ServiceConfig {
@@ -28,8 +28,9 @@ export function servicePlist(config: ServiceConfig, env: NodeJS.ProcessEnv = pro
     HOME: config.home,
     PATH: [dirname(config.node), env.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin'].join(':'),
     SHELL: env.SHELL ?? '/bin/zsh', LANG: env.LANG ?? 'en_US.UTF-8',
-    PORT: String(config.port), CHAT_DATA_DIR: join(config.root, '.data'),
-    CHAT_WORKSPACE: dirname(config.root), CHAT_SERVICE_ID: config.label,
+    PORT: String(config.port), CHAT_DATA_DIR: config.dataDir ?? join(config.root, '.data'),
+    CHAT_WORKSPACE: config.workspace ?? dirname(config.root), CHAT_SERVICE_ID: config.label,
+    ...(env.CHAT_UPDATE_CHECK === '0' ? { CHAT_UPDATE_CHECK: '0' } : {}),
   };
   const args = [config.node, '--import', pathToFileURL(join(config.root, 'node_modules/tsx/dist/loader.mjs')).href, join(config.root, 'server/index.ts')];
   return `<?xml version="1.0" encoding="UTF-8"?>

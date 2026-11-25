@@ -47,6 +47,86 @@ Inside Pi, run **`/login`** and follow the prompts to connect a supported subscr
 
 Follow the Run section below from this repository. Chat uses the Pi configuration and saved credentials for the same operating-system user; no API key needs to be pasted into the web interface. Restart Chat after changing provider credentials if the model list does not update.
 
+## Install as a Pi package / download a release
+
+Published versions are distributed through **[GitHub Releases](https://github.com/Sebastian-Vetter/Chat-for-Pi/releases)**, not the npm registry. The release workflow creates the downloads when a maintainer pushes a matching stable version tag. Until that happens, local commits and prepared artifacts are **not published releases**.
+
+### Pi-managed installation (macOS)
+
+After release `v1.0.5` is published, install its version-pinned Pi package:
+
+```sh
+pi install git:github.com/Sebastian-Vetter/Chat-for-Pi@v1.0.5
+```
+
+In Pi:
+
+```text
+/reload
+/chat-server install
+/chat-server start
+/chat-server open
+```
+
+`install` asks before copying trusted application code, running `npm ci --include=dev` (including dependency install scripts), and building it. Requires Node.js 22.19+, npm, and internet access. It never starts or stops a server automatically. Pi package code is trusted local code with your user permissions, not a sandbox.
+
+Application code is installed into `~/.local/share/pi-chat/app`; sessions and queues live separately in `~/.local/share/pi-chat/data`. Pi may move or replace its cached package without changing these stable service/data paths. Updating stages and builds a new app before switching; failed preparation leaves the old app untouched. The old app directory is retained as `previous-app-<id>` for manual rollback or cleanup. Do not replace it while the server is running.
+
+If you previously used `npm run pi:install`, run `npm run pi:uninstall` from that checkout before installing the package, then `/reload`, to avoid duplicate `/chat-server` commands. An existing checkout's `.data` is **not automatically migrated**. Keep it backed up and use the old checkout to access those chats until you deliberately migrate the full data directory with both servers stopped. Never edit original Pi CLI session files.
+
+### Download without Git
+
+Each release provides:
+
+- `pi-chat-extension-X.Y.Z.tgz`: self-contained Pi package source (no bundled host SDK and no install-on-load hooks).
+- `pi-chat-app-X.Y.Z.tar.gz`: standalone app source plus built frontend.
+- `SHA256SUMS`: SHA-256 checksums for both downloads.
+
+Download your chosen assets and `SHA256SUMS` from the same release page. Verify the relevant checksum before extracting, e.g. `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux (download both archives for a complete check). Checksums detect corruption; they are not a separate publisher signature.
+
+For the Pi package, extract `pi-chat-extension-X.Y.Z.tgz` into a dedicated directory and run `pi install ./package` from that directory, then `/reload` and `/chat-server install`. Retain the extracted package directory: local Pi package sources are referenced in place, not copied by Pi.
+
+For the standalone app on macOS/Linux/Windows, extract `pi-chat-app-X.Y.Z.tar.gz`, then:
+
+```sh
+cd app
+npm ci --include=dev
+npm run build
+npm start
+```
+
+The build tools and SDK are intentionally installed via `--include=dev` in the independent application, while the Pi extension itself uses only Node built-ins and host-provided peer types. Open http://127.0.0.1:3001. The managed background service still requires macOS; Linux/Windows can run the standalone server in the foreground. You can set `CHAT_DATA_DIR` to a stable absolute directory outside the extracted app to preserve data across download replacements.
+
+### Update notices and installing updates
+
+The web app automatically checks public GitHub stable releases when opened and hourly while a tab remains open. A banner such as **“Version 1.0.6 available”** opens release notes, downloads, and update instructions. You can also open **Settings → Updates & releases → Check for updates**, or run `/chat-server updates` in Pi to check the installed package version.
+
+Checks send only a fixed request for public release metadata to GitHub, never conversations, workspace paths, provider credentials, or GitHub tokens. Requests have a five-second timeout, are coalesced and cached for one hour (five minutes on failure); manual checks are limited to once per minute. Offline/rate-limit errors do not interrupt chats. Prereleases and draft releases are not offered, and a newer local build is never told to downgrade. Remote release-note images are not loaded. Set `CHAT_UPDATE_CHECK=0` in the server environment to disable checks. For the managed macOS service, set it before `/chat-server start` or `npm run server:start`; it is the only update-related environment flag persisted in the launch agent, and changing it requires an explicit restart.
+
+**Updates never install or restart automatically.** For a Pi-managed installation:
+
+1. Finish active web runs and configured tests.
+2. Install the new version tag shown in the notice using `pi install git:github.com/Sebastian-Vetter/Chat-for-Pi@vX.Y.Z`, then `/reload` in Pi. Version-pinned tags do not advance via `pi update --extensions` alone.
+3. Explicitly confirm `/chat-server stop` if it is running.
+4. Run `/chat-server install` and confirm the trusted installation/build.
+5. Run `/chat-server start`, `/chat-server open`, and reload the browser.
+
+For an existing Git checkout, keep using the pull/build/restart instructions below to preserve its data path; do not switch installation methods just to update.
+
+## Build and publish releases (maintainers)
+
+```sh
+# Add notes under Unreleased first.
+npm run release -- patch
+npm test
+npm run package:build
+npm run package:verify
+```
+
+`package:build` writes only allowlisted application files, a dependency-free bundled Pi extension, both archives, checksums, and release notes under ignored `.release/`. It does not publish anything. `package:verify` verifies archive contents/checksums, loads the extension without this checkout's node_modules, and installs/builds/starts the standalone app in temporary storage without real-provider calls.
+
+Commit the synchronized version/changelog first. **Only when publication is intended**, tag that commit as `vX.Y.Z` matching `package.json`, push the commit and tag to GitHub, and let `.github/workflows/release.yml` test, build, verify, and publish the GitHub Release and assets using the repository's built-in Actions token. No npm account or npm publishing token is required. The Actions workflow must be enabled and allowed to write repository contents. Do not overwrite an existing release tag; publish a new patch instead.
+
 ## Run
 
 Use Node.js 22.19 or newer. For a fresh checkout:

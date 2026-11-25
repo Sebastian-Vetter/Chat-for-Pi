@@ -4,9 +4,10 @@ for (const width of [1280, 390]) {
   test(`sessions archive, restore and hide persist at ${width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width, height: 844 });
     const chat = await (await request.post('/api/chats', { data: { cwd: process.cwd() } })).json();
-    const title = `Archive fixture ${width}`;
+    const title = `Archive fixture ${width} ${chat.id}`;
     await request.patch(`/api/chats/${chat.id}`, { data: { title } });
     async function openSidebar() {
+      await expect(page.getByRole('textbox', { name: 'Message Pi', exact: true })).toBeVisible();
       const button = page.getByRole('button', { name: 'Open sidebar', exact: true });
       if (await button.isVisible()) await button.click();
     }

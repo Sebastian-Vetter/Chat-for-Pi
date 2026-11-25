@@ -4,6 +4,15 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-25
+
+### Added
+
+- Installable Pi package manifest and a dependency-free distribution extension with confirmed `/chat-server install` and `/chat-server updates` commands. Managed application/data paths are independent of Pi's package cache; updates stage and build before switching, preserve sessions, and retain rollback code without automatically stopping services.
+- Release packaging with Pi-package and standalone-app downloads, SHA-256 checksums, release notes, and an isolated clean-install verification command. A version-tagged GitHub Actions workflow tests and publishes GitHub Release assets; npm registry publication is not required.
+- Automatic hourly public stable-release checks, an available-version banner, release notes/downloads and explicit update instructions under Settings → Updates & releases. Checks have timeouts, caching, rate limiting, offline/error states, and an opt-out; no prompts, workspace paths, or credentials are sent.
+- Regression tests for update metadata validation, cache/rate limits, installer data preservation and failures, API safety, and desktop/mobile update notices. Tests disable real online release checks and live-provider calls remain opt-in. Browser workers are capped at two for reliable release verification, and archive fixtures use unique titles and wait for the rendered app.
+
 ## [1.0.4] - 2026-11-25
 
 ### Added

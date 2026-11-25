@@ -9,7 +9,7 @@ import { once } from 'node:events';
 test('local API validates requests and persists a chat lifecycle', { timeout: 45000 }, async () => {
   const dataDir = mkdtempSync(join(tmpdir(), 'pi-chat-api-'));
   const port = 13001;
-  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { env: { ...process.env, PORT: String(port), CHAT_DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { env: { ...process.env, CHAT_UPDATE_CHECK: '0', PORT: String(port), CHAT_DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = '';
   child.stdout.on('data', chunk => { logs += chunk; }); child.stderr.on('data', chunk => { logs += chunk; });
   const base = `http://127.0.0.1:${port}/api`;
@@ -24,6 +24,9 @@ test('local API validates requests and persists a chat lifecycle', { timeout: 45
       await new Promise(r => setTimeout(r, 100));
     }
     assert.ok(ready, logs);
+    assert.equal((await (await request('/updates')).json()).status, 'disabled');
+    assert.equal((await (await request('/updates/check', 'POST', {})).json()).status, 'disabled');
+    assert.equal((await request('/updates/check', 'POST', {}, { Origin: 'https://evil.example' })).status, 403);
     assert.equal((await request('/chats', 'GET', undefined, { Origin: 'https://evil.example' })).status, 403);
     assert.equal((await request('/chats', 'POST', { cwd: '/not-a-real-directory-12345' })).status, 400);
     const created = await request('/chats', 'POST', { cwd: tmpdir() });

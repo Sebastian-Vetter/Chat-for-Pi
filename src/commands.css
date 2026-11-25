@@ -1,3 +1,10 @@
+.update-notice { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 24px; color: #c5e6b6; background: #c5e6b60a; font-size: 12px; border-bottom: 1px solid #c5e6b622; }
+.update-notice button { color: inherit; text-decoration: underline; }
+.updates-dialog { max-height: 85dvh; overflow: auto; max-width: 660px; }
+.updates-dialog pre { background: #111612; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.updates-dialog li { font-size: 13px; line-height: 1.8; margin-bottom: 8px; }
+.release-notes { border-top: 1px solid #ffffff19; margin-top: 20px; font-size: 13px; overflow-wrap: anywhere; }
+.release-notes pre { overflow: auto; }
 .session-list-controls { display: flex; align-items: center; justify-content: space-between; margin: 16px 4px 0; gap: 6px; }
 .session-list-controls button { display: inline-flex; align-items: center; gap: 7px; color: #919895; font-size: 11px; padding: 8px 4px; }
 .session-list-controls button:hover { color: #c5e6b6; }

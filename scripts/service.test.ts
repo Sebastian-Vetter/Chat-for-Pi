@@ -10,6 +10,10 @@ test('launchd plist escapes paths and never persists API keys or terminal sessio
   const plist = servicePlist(config, { PATH: '/bin', OPENAI_API_KEY: 'do-not-store', PI_SESSION_ID: 'terminal-session' });
   assert.match(plist, /A&amp;B/); assert.match(plist, /KeepAlive/);
   assert.ok(!plist.includes('do-not-store')); assert.ok(!plist.includes('terminal-session'));
+  const managed = servicePlist({ ...config, dataDir: '/tmp/independent-data' }, { CHAT_UPDATE_CHECK: '0', GITHUB_TOKEN: 'secret-token' });
+  assert.match(managed, /CHAT_UPDATE_CHECK<\/key><string>0<\/string>/);
+  assert.match(managed, /CHAT_DATA_DIR<\/key><string>\/tmp\/independent-data<\/string>/);
+  assert.ok(!managed.includes('secret-token'));
 });
 test('service start is idempotent and stop removes login startup without killing foreign processes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'chat-service-'));

@@ -8,6 +8,7 @@ import { AgentService } from './agent.js';
 import { changes, fileDiff } from './git.js';
 import { discoverTasks, PipelineService } from './pipelines.js';
 import { PiSessions } from './pi-sessions.js';
+import { UpdateChecker } from '../scripts/updates.ts';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -17,6 +18,7 @@ const agents = new AgentService(store);
 const pipelines = new PipelineService(agents.activity, record => agents.publish(record));
 const piSessions = new PiSessions(store);
 const appVersion: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+const updates = new UpdateChecker(appVersion, process.env.CHAT_UPDATE_CHECK !== '0');
 const webPort = Number(process.env.CHAT_WEB_PORT ?? 5173);
 const allowed = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `127.0.0.1:${webPort}`, `localhost:${webPort}`]);
 app.use((req, res, next) => {
@@ -38,6 +40,8 @@ app.get('/api/config', async (_req, res) => {
   const models = (await runtime.getAvailable()).map(m => ({ key: `${m.provider}/${m.id}`, name: m.name, provider: m.provider }));
   res.json({ version: appVersion, defaultCwd: resolve(process.env.CHAT_WORKSPACE ?? '..'), home: homedir(), models });
 });
+app.get('/api/updates', async (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json(await updates.check()); });
+app.post('/api/updates/check', async (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json(await updates.check(true)); });
 app.get('/api/chats', (_req, res) => res.json(store.list()));
 app.get('/api/pi-sessions', async (req, res) => res.json(await piSessions.list(typeof req.query.q === 'string' ? req.query.q.slice(0, 200) : '', Math.max(0, Number(req.query.offset) || 0))));
 app.get('/api/pi-sessions/:key', async (req, res) => res.json(await piSessions.preview(req.params.key)));
