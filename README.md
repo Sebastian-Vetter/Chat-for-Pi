@@ -2,9 +2,54 @@
 
 A local, ChatGPT-style web workspace for the real Pi coding agent. Built with React, TypeScript, Vite, Express, and the Pi SDK.
 
+Website: **[aptcode.de](https://aptcode.de)**
+
+## How to install Pi
+
+Already using Pi on this computer? Keep your existing installation and provider configuration; you do not need to reinstall it.
+
+### 1. Install the Pi CLI
+
+Pi requires **Node.js 22.19 or newer**. If Node.js is already installed, install the CLI with npm:
+
+```sh
+node --version
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+pi --version
+```
+
+Alternatively, the official installer can install Node.js if needed. On macOS or Linux:
+
+```sh
+curl -fsSL https://pi.dev/install.sh | sh
+```
+
+On Windows, use PowerShell:
+
+```powershell
+irm https://pi.dev/install.ps1 | iex
+```
+
+These installer commands download and execute a script. Review it first if you prefer, or use the npm installation above. See **[Pi's official documentation](https://pi.dev)** for installation and updates.
+
+### 2. Connect your AI provider
+
+Start Pi from a project directory:
+
+```sh
+cd /path/to/your/project
+pi
+```
+
+Inside Pi, run **`/login`** and follow the prompts to connect a supported subscription or API key. Use **`/model`** to choose a model, then send a short message to check the connection. Provider usage may incur charges.
+
+### 3. Start Chat
+
+Follow the Run section below from this repository. Chat uses the Pi configuration and saved credentials for the same operating-system user; no API key needs to be pasted into the web interface. Restart Chat after changing provider credentials if the model list does not update.
+
 ## Run
 
-Use Node.js 22 or newer. Run commands from this directory:
+Use Node.js 22.19 or newer. Run commands from this directory:
 
 ```sh
 npm install
