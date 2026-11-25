@@ -4,5 +4,6 @@ import App from './App';
 import './styles.css';
 import './workspace.css';
 import './inspector.css';
+import './session.css';
 import './motion.css';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
