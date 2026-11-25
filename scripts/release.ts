@@ -15,7 +15,7 @@ try {
   const parts = version.split('.').map(Number); const firstDifference = parts.findIndex((n, i) => n !== current[i]);
   if (firstDifference < 0 || parts[firstDifference] < current[firstDifference]) throw new Error('The new version must be greater than the current version.');
   const path = new URL('CHANGELOG.md', root), changelog = readFileSync(path, 'utf8');
-  const match = /## \[Unreleased\]\s*\n([\s\S]*?)(?=\n## \[|$)/.exec(changelog);
+  const match = /## \[Unreleased\][^\S\r\n]*\r?\n([\s\S]*?)(?=\r?\n## \[|$)/.exec(changelog);
   if (!match?.[1].trim()) throw new Error('Add release notes under ## [Unreleased] in CHANGELOG.md before releasing.');
   const updated = changelog.replace(match[0], `## [Unreleased]\n\n## [${version}] - ${new Date().toISOString().slice(0, 10)}\n\n${match[1].trim()}\n`);
   const lockPath = new URL('package-lock.json', root), lock = JSON.parse(readFileSync(lockPath, 'utf8'));
