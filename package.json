@@ -7,8 +7,16 @@
     "dev": "concurrently -k -n api,web \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts",
-    "test": "tsx --test server/*.test.ts",
-    "test:e2e": "playwright test"
+    "test": "tsx --test server/*.test.ts scripts/*.test.ts extensions/*.test.ts",
+    "test:e2e": "playwright test",
+    "pi:install": "tsx scripts/chat-server.ts install",
+    "pi:uninstall": "tsx scripts/chat-server.ts uninstall",
+    "server:start": "tsx scripts/chat-server.ts start",
+    "server:status": "tsx scripts/chat-server.ts status",
+    "server:stop": "tsx scripts/chat-server.ts stop",
+    "server:restart": "tsx scripts/chat-server.ts restart",
+    "server:logs": "tsx scripts/chat-server.ts logs",
+    "server:open": "tsx scripts/chat-server.ts open"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.6.1",
