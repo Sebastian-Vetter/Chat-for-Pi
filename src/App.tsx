@@ -9,6 +9,7 @@ import SettingsDialog, { readPreferences, playFinishSound, unlockSound } from '.
 import PiSessionBrowser from './PiSessions';
 import { ContextMeter, PromptQueue } from './SessionStatus';
 import ThinkingPanel from './ThinkingPanel';
+import { version as appVersion } from '../package.json';
 
 const starters = [
   { icon: Code2, title: 'Build something new', text: 'Help me plan and build a new application in this workspace.' },
@@ -154,7 +155,7 @@ export default function App() {
         <div className="chat-item-actions"><button className="icon-button" aria-label={`Rename ${chat.title}`} onClick={() => void rename(chat)}><MoreHorizontal size={14} /></button><button className="icon-button" aria-label={`Delete ${chat.title}`} onClick={() => void remove(chat)}><Trash2 size={13} /></button></div>
       </div>) : <div className="empty-history">{search ? 'No matching conversations.' : 'A little space for your next big idea. Start a conversation.'}</div>}</nav>
       <InstructionFiles chatId={active} />
-      <div className="sidebar-footer"><span className="local-dot" /><div><strong>Your local workspace</strong><small>{Object.values(runningChats).filter(Boolean).length ? `${Object.values(runningChats).filter(Boolean).length} sessions running` : 'Powered by Pi coding agent'}</small><button className="version-label" title="Version and settings" onClick={() => setSettingsOpen(true)}>v{config?.version ?? '…'}</button></div><button className="icon-button sidebar-settings" aria-label="Open settings" title={mac ? 'Settings (⌘ ,)' : 'Settings (Ctrl ,)'} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button></div>
+      <div className="sidebar-footer"><span className="local-dot" /><div><strong>Your local workspace</strong><small>{Object.values(runningChats).filter(Boolean).length ? `${Object.values(runningChats).filter(Boolean).length} sessions running` : 'Powered by Pi coding agent'}</small><button className="version-label" title="Version and settings" onClick={() => setSettingsOpen(true)}>v{appVersion}</button></div><button className="icon-button sidebar-settings" aria-label="Open settings" title={mac ? 'Settings (⌘ ,)' : 'Settings (Ctrl ,)'} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button></div>
     </aside></>}
     <main className="main-panel">
       <header className="topbar"><div className="topbar-left">{!sidebar && <button className="icon-button" aria-label="Open sidebar" onClick={() => setSidebar(true)}><Menu size={20} /></button>}<span className="page-title">{currentChat?.title ?? 'New conversation'}</span><span className="subtle-pill">Pi agent</span></div><button className="workspace-button" onClick={() => setWorkspaceOpen(true)} title={currentChat?.cwd ?? cwd}><Folder size={14} /><span>{(currentChat?.cwd ?? cwd).split('/').filter(Boolean).at(-1) || 'Workspace'}</span><ChevronDown size={13} /></button><button className={`workspace-tools-button ${inspectorOpen ? 'selected' : ''}`} aria-label="Toggle workspace tools" aria-expanded={inspectorOpen} onClick={() => setInspectorOpen(!inspectorOpen)}><Code2 size={16} /><span>Tools</span></button></header>
@@ -169,7 +170,7 @@ export default function App() {
       </div>
     </main>
     {inspectorOpen && <Inspector chatId={active} events={snapshot?.events ?? []} close={() => setInspectorOpen(false)} />}
-    {settingsOpen && <SettingsDialog value={preferences} version={config?.version} save={next => { setPreferences(next); setSoundNotice(''); }} close={() => setSettingsOpen(false)} />}
+    {settingsOpen && <SettingsDialog value={preferences} version={appVersion} save={next => { setPreferences(next); setSoundNotice(''); }} close={() => setSettingsOpen(false)} />}
     {piSessionsOpen && <PiSessionBrowser close={() => setPiSessionsOpen(false)} imported={chat => { setChats(current => [chat, ...current]); selectChat(chat.id); setPiSessionsOpen(false); if (window.innerWidth <= 760) setSidebar(false); }} />}
     {workspaceOpen && <WorkspaceDialog value={currentChat?.cwd ?? cwd} locked={!!active} close={() => setWorkspaceOpen(false)} save={value => { setCwd(value); setWorkspaceOpen(false); }} />}
     <KeyboardShortcut action={newChat} />

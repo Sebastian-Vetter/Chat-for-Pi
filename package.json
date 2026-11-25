@@ -1,6 +1,6 @@
 {
   "name": "pi-chat",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,9 @@
     "server:open": "tsx scripts/chat-server.ts open",
     "release": "tsx scripts/release.ts"
   },
-  "engines": { "node": ">=22.19.0" },
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.6.1",
     "express": "^5.1.0",

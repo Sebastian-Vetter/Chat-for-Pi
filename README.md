@@ -189,10 +189,12 @@ Paths are resolved relative to the directory where the server starts. `CHAT_API_
 
 ## Versions and changelog
 
-The starting version is **1.0.0**, read from `package.json` and displayed at the bottom-left of the sidebar and in Settings. See [CHANGELOG.md](CHANGELOG.md). Add release notes under its Unreleased heading before preparing the next version:
+Versions started at **1.0.0**. The current version comes from `package.json` and is included in the frontend build, displayed at the bottom-left of the sidebar and in Settings. The UI therefore shows the newly built version after a browser refresh without requiring a backend restart just to update the label.
+
+**Every shipped change gets a version bump and a matching [CHANGELOG.md](CHANGELOG.md) entry.** Use patch bumps by default, and choose minor/major bumps intentionally for feature/breaking releases. Add release notes under Unreleased before preparing each version:
 
 ```sh
-npm run release -- patch   # 1.0.0 → 1.0.1
+npm run release -- patch   # Increment the current patch version
 # Or: minor, major, or an explicit higher stable version such as 1.1.0
 ```
 
