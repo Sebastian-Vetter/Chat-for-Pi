@@ -92,4 +92,4 @@ Paths are resolved relative to the directory where the server starts. Vite's dev
 - `server/store.ts` — atomic chat metadata writes
 - `server/*.test.ts`, `tests/` — unit/API and browser checks
 
-Work is recorded as small commits on `main`. No GitLab remote or deployment is configured yet.
+Work is recorded as small commits. The initial implementation commits are on `main`; the current working branch is `dev`. The repository currently has an `origin` remote at `https://github.com/Sebastian-Vetter/Chat-for-Pi.git`. No deployment is configured by this app.
