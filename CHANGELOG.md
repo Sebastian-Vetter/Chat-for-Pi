@@ -6,6 +6,7 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ### Changed
 
+- Pinned the prompt queue below the chat header so it stays visible while the transcript scrolls. Hide/Show collapses it to a compact count/status bar, with the preference remembered in this browser and no change to queue execution.
 - Moved Thinking & activity into the conversation transcript, including when a run has not produced its first message yet.
 - Replaced the visible “Pi is working” status line with a left-to-right light flowing along the composer’s bottom border. Reduce Motion uses a static highlight; screen readers retain a working-status announcement.
 
