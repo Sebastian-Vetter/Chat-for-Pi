@@ -25,6 +25,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '1mb' }));
+app.get('/api/health', (_req, res) => res.json({ app: 'pi-chat', pid: process.pid, serviceId: process.env.CHAT_SERVICE_ID ?? null }));
 app.get('/api/config', async (_req, res) => {
   const runtime = await agents.runtime;
   const models = (await runtime.getAvailable()).map(m => ({ key: `${m.provider}/${m.id}`, name: m.name, provider: m.provider }));
