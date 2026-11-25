@@ -1,6 +1,7 @@
 export interface Chat { id: string; title: string; cwd: string; createdAt: string; updatedAt: string }
 export interface Message { role: string; text: string; toolName?: string; isError?: boolean }
-export interface Snapshot { chat: Chat; messages: Message[]; busy: boolean; tool?: string; error?: string; model?: string }
+export interface ActivityEvent { id: string; type: 'agent' | 'tool' | 'test'; label: string; status: 'running' | 'passed' | 'failed' | 'stopped' | 'interrupted'; timestamp: string; durationMs?: number; detail?: string }
+export interface Snapshot { chat: Chat; events?: ActivityEvent[]; messages: Message[]; busy: boolean; tool?: string; error?: string; model?: string }
 export interface Config { defaultCwd: string; models: { key: string; name: string; provider: string }[] }
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
