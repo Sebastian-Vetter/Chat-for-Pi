@@ -1,25 +1,142 @@
-.update-notice { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 24px; color: #c5e6b6; background: #c5e6b60a; font-size: 12px; border-bottom: 1px solid #c5e6b622; }
-.update-notice button { color: inherit; text-decoration: underline; }
-.updates-dialog { max-height: 85dvh; overflow: auto; max-width: 660px; }
-.updates-dialog pre { background: #111612; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
-.updates-dialog li { font-size: 13px; line-height: 1.8; margin-bottom: 8px; }
-.release-notes { border-top: 1px solid #ffffff19; margin-top: 20px; font-size: 13px; overflow-wrap: anywhere; }
-.release-notes pre { overflow: auto; }
-.session-list-controls { display: flex; align-items: center; justify-content: space-between; margin: 16px 4px 0; gap: 6px; }
-.session-list-controls button { display: inline-flex; align-items: center; gap: 7px; color: #919895; font-size: 11px; padding: 8px 4px; }
-.session-list-controls button:hover { color: #c5e6b6; }
-.session-list-controls span { font-size: 10px; opacity: .65; }
-.web-command-result { max-width: 760px; margin: 16px auto; padding: 12px 20px; font-size: 13px; border-left: 2px solid #8885; }
-.web-command-result p { margin-bottom: 0; opacity: .8; }
-.commands-button { background: none; border: 0; color: var(--text-muted, #888); cursor: pointer; white-space: nowrap; font: inherit; font-size: 12px; }
-.command-dialog { max-height: 85dvh; overflow: auto; }
-.command-list { display: grid; gap: 6px; }
-.command-list button { display: grid; gap: 4px; text-align: left; border: 1px solid #8883; border-radius: 8px; background: transparent; color: inherit; padding: 10px; cursor: pointer; }
-.command-list button:hover { background: #8881; }
-.command-list span { font-size: 12px; opacity: .75; }
-.subagents-panel { max-width: 800px; margin: 16px auto; padding: 16px; border: 1px solid #8884; border-radius: 12px; width: calc(100% - 40px); box-sizing: border-box; font-size: 13px; }
-.subagents-panel header { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
-.subagents-panel header span, .subagents-panel p { opacity: .7; }
-.subagents-panel details { margin-top: 12px; }
-.subagents-panel summary { cursor: pointer; }
-.subagents-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font-size: 12px; }
+.update-notice {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 24px;
+  color: #c5e6b6;
+  background: #c5e6b60a;
+  font-size: 12px;
+  border-bottom: 1px solid #c5e6b622;
+}
+.update-notice button {
+  color: inherit;
+  text-decoration: underline;
+}
+.updates-dialog {
+  max-height: 85dvh;
+  overflow: auto;
+  max-width: 660px;
+}
+.updates-dialog pre {
+  background: #111612;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.updates-dialog li {
+  font-size: 13px;
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+.release-notes {
+  border-top: 1px solid #ffffff19;
+  margin-top: 20px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.release-notes pre {
+  overflow: auto;
+}
+.session-list-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 4px 0;
+  gap: 6px;
+}
+.session-list-controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #919895;
+  font-size: 11px;
+  padding: 8px 4px;
+}
+.session-list-controls button:hover {
+  color: #c5e6b6;
+}
+.session-list-controls span {
+  font-size: 10px;
+  opacity: 0.65;
+}
+.web-command-result {
+  max-width: 760px;
+  margin: 16px auto;
+  padding: 12px 20px;
+  font-size: 13px;
+  border-left: 2px solid #8885;
+}
+.web-command-result p {
+  margin-bottom: 0;
+  opacity: 0.8;
+}
+.commands-button {
+  background: none;
+  border: 0;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 12px;
+}
+.command-dialog {
+  max-height: 85dvh;
+  overflow: auto;
+}
+.command-list {
+  display: grid;
+  gap: 6px;
+}
+.command-list button {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid #8883;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  padding: 10px;
+  cursor: pointer;
+}
+.command-list button:hover {
+  background: #8881;
+}
+.command-list span {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.subagents-panel {
+  max-width: 800px;
+  margin: 16px auto;
+  padding: 16px;
+  border: 1px solid #8884;
+  border-radius: 12px;
+  width: calc(100% - 40px);
+  box-sizing: border-box;
+  font-size: 13px;
+}
+.subagents-panel header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+.subagents-panel header span,
+.subagents-panel p {
+  opacity: 0.7;
+}
+.subagents-panel details {
+  margin-top: 12px;
+}
+.subagents-panel summary {
+  cursor: pointer;
+}
+.subagents-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 12px;
+}

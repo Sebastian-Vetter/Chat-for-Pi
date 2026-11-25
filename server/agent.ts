@@ -1,4 +1,11 @@
-import { createAgentSession, DefaultResourceLoader, getAgentDir, ModelRuntime, SessionManager, type AgentSession } from '@earendil-works/pi-coding-agent';
+import {
+  createAgentSession,
+  DefaultResourceLoader,
+  getAgentDir,
+  ModelRuntime,
+  SessionManager,
+  type AgentSession,
+} from '@earendil-works/pi-coding-agent';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatRecord, ChatStore } from './store.js';
@@ -7,14 +14,42 @@ import { ActivityLog } from './activity.js';
 import { PromptQueues } from './queue.js';
 import { Subagents } from './subagents.js';
 
-export interface DisplayMessage { role: string; text: string; toolName?: string; isError?: boolean }
-export function displayMessages(messages: readonly unknown[], streamingMessage?: unknown): DisplayMessage[] {
-  return [...messages, ...(streamingMessage ? [streamingMessage] : [])].flatMap(raw => {
-    const message = raw as { role: string; content?: string | { type: string; text?: string }[]; toolName?: string; isError?: boolean; errorMessage?: string };
+export interface DisplayMessage {
+  role: string;
+  text: string;
+  toolName?: string;
+  isError?: boolean;
+}
+export function displayMessages(
+  messages: readonly unknown[],
+  streamingMessage?: unknown,
+): DisplayMessage[] {
+  return [...messages, ...(streamingMessage ? [streamingMessage] : [])].flatMap((raw) => {
+    const message = raw as {
+      role: string;
+      content?: string | { type: string; text?: string }[];
+      toolName?: string;
+      isError?: boolean;
+      errorMessage?: string;
+    };
     if (!['user', 'assistant', 'toolResult'].includes(message.role)) return [];
-    const text = typeof message.content === 'string' ? message.content : (message.content ?? []).filter(c => c.type === 'text').map(c => c.text ?? '').join('\n');
+    const text =
+      typeof message.content === 'string'
+        ? message.content
+        : (message.content ?? [])
+            .filter((c) => c.type === 'text')
+            .map((c) => c.text ?? '')
+            .join('\n');
     return text || message.role === 'toolResult' || message.errorMessage
-      ? [{ role: message.role, text: text || message.errorMessage || '', toolName: message.toolName, isError: message.isError || !!message.errorMessage }] : [];
+      ? [
+          {
+            role: message.role,
+            text: text || message.errorMessage || '',
+            toolName: message.toolName,
+            isError: message.isError || !!message.errorMessage,
+          },
+        ]
+      : [];
   });
 }
 export class AgentService {
@@ -30,70 +65,185 @@ export class AgentService {
   private closing = false;
   readonly queues: PromptQueues;
   private subagents: Subagents;
-  constructor(private store: ChatStore, readonly activity = new ActivityLog(join(store.directory, 'activity'))) { this.queues = new PromptQueues(join(store.directory, 'queues')); this.subagents = new Subagents(this.runtime, activity, record => this.publish(record)); }
-  summariesList() { return this.store.list().map(chat => ({ id: chat.id, title: chat.title, busy: this.busy(chat.id), error: this.errors.get(chat.id) })); }
-  subscribeAll(fn: (summary: unknown) => void) { this.globalListeners.add(fn); return () => { this.globalListeners.delete(fn); }; }
+  constructor(
+    private store: ChatStore,
+    readonly activity = new ActivityLog(join(store.directory, 'activity')),
+  ) {
+    this.queues = new PromptQueues(join(store.directory, 'queues'));
+    this.subagents = new Subagents(this.runtime, activity, (record) => this.publish(record));
+  }
+  summariesList() {
+    return this.store.list().map((chat) => ({
+      id: chat.id,
+      title: chat.title,
+      busy: this.busy(chat.id),
+      error: this.errors.get(chat.id),
+    }));
+  }
+  subscribeAll(fn: (summary: unknown) => void) {
+    this.globalListeners.add(fn);
+    return () => {
+      this.globalListeners.delete(fn);
+    };
+  }
   enqueue(record: ChatRecord, text: string, model?: string) {
     if (this.closing) throw new Error('Server is shutting down');
-    this.queues.add(record.id, text, model); this.publish(record); this.drain(record);
+    this.queues.add(record.id, text, model);
+    this.publish(record);
+    this.drain(record);
   }
-  pauseQueue(record: ChatRecord, paused: boolean) { this.queues.pause(record.id, paused); this.publish(record); if (!paused) this.drain(record); }
+  pauseQueue(record: ChatRecord, paused: boolean) {
+    this.queues.pause(record.id, paused);
+    this.publish(record);
+    if (!paused) this.drain(record);
+  }
   private drain(record: ChatRecord) {
     if (this.closing || this.busy(record.id) || !this.store.get(record.id)) return;
-    const next = this.queues.take(record.id); if (!next) return;
-    void this.prompt(record, next.text, next.model).finally(() => { this.queues.complete(record.id); this.publish(record); this.drain(record); }).catch(error => console.error('Queued prompt failed:', error));
+    const next = this.queues.take(record.id);
+    if (!next) return;
+    void this.prompt(record, next.text, next.model)
+      .finally(() => {
+        this.queues.complete(record.id);
+        this.publish(record);
+        this.drain(record);
+      })
+      .catch((error) => console.error('Queued prompt failed:', error));
   }
-  busy(id: string) { return this.running.has(id); }
+  busy(id: string) {
+    return this.running.has(id);
+  }
   instructions(record: ChatRecord) {
-    return conversationInstructions(record.cwd, this.sessions.get(record.id)?.resourceLoader.getAgentsFiles().agentsFiles);
+    return conversationInstructions(
+      record.cwd,
+      this.sessions.get(record.id)?.resourceLoader.getAgentsFiles().agentsFiles,
+    );
   }
   snapshot(record: ChatRecord) {
     const session = this.sessions.get(record.id);
-    const messages = session?.messages ?? (record.sessionFile && existsSync(record.sessionFile) ? SessionManager.open(record.sessionFile).buildSessionContext().messages : []);
-    return { chat: record, contextUsage: session?.getContextUsage() ?? record.contextUsage, contextStale: !session, queue: this.queues.state(record.id).items, queuePaused: this.queues.state(record.id).paused, events: this.activity.list(record.id), messages: displayMessages(messages, session?.state.streamingMessage), busy: this.busy(record.id), tool: this.tools.get(record.id), error: this.errors.get(record.id), model: session?.model ? `${session.model.provider}/${session.model.id}` : record.modelName };
+    const messages =
+      session?.messages ??
+      (record.sessionFile && existsSync(record.sessionFile)
+        ? SessionManager.open(record.sessionFile).buildSessionContext().messages
+        : []);
+    return {
+      chat: record,
+      contextUsage: session?.getContextUsage() ?? record.contextUsage,
+      contextStale: !session,
+      queue: this.queues.state(record.id).items,
+      queuePaused: this.queues.state(record.id).paused,
+      events: this.activity.list(record.id),
+      messages: displayMessages(messages, session?.state.streamingMessage),
+      busy: this.busy(record.id),
+      tool: this.tools.get(record.id),
+      error: this.errors.get(record.id),
+      model: session?.model ? `${session.model.provider}/${session.model.id}` : record.modelName,
+    };
   }
   subscribe(id: string, fn: (event: unknown) => void) {
-    const group = this.listeners.get(id) ?? new Set(); group.add(fn); this.listeners.set(id, group);
-    return () => { group.delete(fn); if (!group.size) this.listeners.delete(id); };
+    const group = this.listeners.get(id) ?? new Set();
+    group.add(fn);
+    this.listeners.set(id, group);
+    return () => {
+      group.delete(fn);
+      if (!group.size) this.listeners.delete(id);
+    };
   }
   publish(record: ChatRecord) {
-    const snapshot = this.snapshot(record); this.listeners.get(record.id)?.forEach(fn => fn(snapshot));
-    const summary = { id: record.id, title: record.title, busy: this.busy(record.id), error: this.errors.get(record.id) };
+    const snapshot = this.snapshot(record);
+    this.listeners.get(record.id)?.forEach((fn) => fn(snapshot));
+    const summary = {
+      id: record.id,
+      title: record.title,
+      busy: this.busy(record.id),
+      error: this.errors.get(record.id),
+    };
     const serialized = JSON.stringify(summary);
-    if (this.summaries.get(record.id) !== serialized) { this.summaries.set(record.id, serialized); this.globalListeners.forEach(fn => fn(summary)); }
+    if (this.summaries.get(record.id) !== serialized) {
+      this.summaries.set(record.id, serialized);
+      this.globalListeners.forEach((fn) => fn(summary));
+    }
   }
   private async session(record: ChatRecord): Promise<AgentSession> {
-    const cached = this.sessions.get(record.id); if (cached) return cached;
-    const pending = this.loading.get(record.id); if (pending) return pending;
-    const promise = this.create(record); this.loading.set(record.id, promise);
-    try { return await promise; } finally { this.loading.delete(record.id); }
+    const cached = this.sessions.get(record.id);
+    if (cached) return cached;
+    const pending = this.loading.get(record.id);
+    if (pending) return pending;
+    const promise = this.create(record);
+    this.loading.set(record.id, promise);
+    try {
+      return await promise;
+    } finally {
+      this.loading.delete(record.id);
+    }
   }
   private async create(record: ChatRecord) {
     const sessionDir = join(this.store.directory, 'sessions', record.id);
     mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
-    const sessionManager = record.sessionFile && existsSync(record.sessionFile)
-      ? SessionManager.open(record.sessionFile) : SessionManager.create(record.cwd, sessionDir);
+    const sessionManager =
+      record.sessionFile && existsSync(record.sessionFile)
+        ? SessionManager.open(record.sessionFile)
+        : SessionManager.create(record.cwd, sessionDir);
     // TUI extensions require interactive UI bindings; do not execute them in this web host.
-    const resourceLoader = new DefaultResourceLoader({ cwd: record.cwd, agentDir: getAgentDir(), noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true });
+    const resourceLoader = new DefaultResourceLoader({
+      cwd: record.cwd,
+      agentDir: getAgentDir(),
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
+    });
     await resourceLoader.reload();
-    const { session } = await createAgentSession({ cwd: record.cwd, sessionManager, resourceLoader, modelRuntime: await this.runtime,
-      customTools: [this.subagents.tool(record, () => this.sessions.get(record.id))] });
-    session.setActiveToolsByName(session.getActiveToolNames().filter(name => name !== 'subagent').concat(record.subagentsEnabled ? ['subagent'] : []));
+    const { session } = await createAgentSession({
+      cwd: record.cwd,
+      sessionManager,
+      resourceLoader,
+      modelRuntime: await this.runtime,
+      customTools: [this.subagents.tool(record, () => this.sessions.get(record.id))],
+    });
+    session.setActiveToolsByName(
+      session
+        .getActiveToolNames()
+        .filter((name) => name !== 'subagent')
+        .concat(record.subagentsEnabled ? ['subagent'] : []),
+    );
     this.sessions.set(record.id, session);
     if (session.sessionFile) this.store.update(record.id, { sessionFile: session.sessionFile });
-    session.subscribe(event => {
+    session.subscribe((event) => {
       if (event.type === 'tool_execution_start') {
         this.tools.set(record.id, event.toolName);
         const args = event.args as Record<string, unknown>;
-        this.activity.start(record.id, 'tool', event.toolName, JSON.stringify(args, null, 2), `${session.sessionId}:${event.toolCallId}`);
+        this.activity.start(
+          record.id,
+          'tool',
+          event.toolName,
+          JSON.stringify(args, null, 2),
+          `${session.sessionId}:${event.toolCallId}`,
+        );
       }
       if (event.type === 'tool_execution_end') {
         this.tools.delete(record.id);
-        this.activity.update(record.id, `${session.sessionId}:${event.toolCallId}`, { status: event.isError ? 'failed' : 'passed', durationMs: event.durationMs });
+        this.activity.update(record.id, `${session.sessionId}:${event.toolCallId}`, {
+          status: event.isError ? 'failed' : 'passed',
+          durationMs: event.durationMs,
+        });
       }
       if (event.type === 'message_end' && event.message.role === 'assistant') {
-        const id = this.activity.start(record.id, 'agent', 'Assistant response', displayMessages([event.message]).map(m => m.text).join('\n'));
-        this.activity.update(record.id, id, { status: event.message.stopReason === 'aborted' ? 'stopped' : event.message.errorMessage ? 'failed' : 'passed' });
+        const id = this.activity.start(
+          record.id,
+          'agent',
+          'Assistant response',
+          displayMessages([event.message])
+            .map((m) => m.text)
+            .join('\n'),
+        );
+        this.activity.update(record.id, id, {
+          status:
+            event.message.stopReason === 'aborted'
+              ? 'stopped'
+              : event.message.errorMessage
+                ? 'failed'
+                : 'passed',
+        });
       }
       this.publish(record);
     });
@@ -103,64 +253,112 @@ export class AgentService {
     if (this.closing) throw new Error('The server is shutting down');
     if (this.busy(record.id)) throw new Error('This chat is already running');
     const runId = this.activity.start(record.id, 'agent', 'Pi coding run', text);
-    this.running.add(record.id); this.errors.delete(record.id); this.publish(record);
+    this.running.add(record.id);
+    this.errors.delete(record.id);
+    this.publish(record);
     try {
       const session = await this.session(record);
       if (modelKey) {
         const runtime = await this.runtime;
-        const model = (await runtime.getAvailable()).find(m => `${m.provider}/${m.id}` === modelKey);
+        const model = (await runtime.getAvailable()).find(
+          (m) => `${m.provider}/${m.id}` === modelKey,
+        );
         if (!model) throw new Error('Model is not available. Check your Pi credentials.');
         await session.setModel(model);
       }
-      if (record.title === 'New chat') this.store.update(record.id, { title: text.replace(/\s+/g, ' ').slice(0, 70) });
+      if (record.title === 'New chat')
+        this.store.update(record.id, { title: text.replace(/\s+/g, ' ').slice(0, 70) });
       if (text.startsWith('/')) await this.command(record, session, text);
       else await session.prompt(text);
-      const last = text.startsWith('/') ? undefined : session.messages.findLast(message => message.role === 'assistant');
-      this.activity.update(record.id, runId, { status: last?.role === 'assistant' && last.stopReason === 'aborted' ? 'stopped' : last?.role === 'assistant' && last.errorMessage ? 'failed' : 'passed' });
-      if (last?.role === 'assistant' && (last.stopReason === 'aborted' || last.errorMessage)) this.queues.pause(record.id, true);
+      const last = text.startsWith('/')
+        ? undefined
+        : session.messages.findLast((message) => message.role === 'assistant');
+      this.activity.update(record.id, runId, {
+        status:
+          last?.role === 'assistant' && last.stopReason === 'aborted'
+            ? 'stopped'
+            : last?.role === 'assistant' && last.errorMessage
+              ? 'failed'
+              : 'passed',
+      });
+      if (last?.role === 'assistant' && (last.stopReason === 'aborted' || last.errorMessage))
+        this.queues.pause(record.id, true);
     } catch (error) {
-      this.activity.update(record.id, runId, { status: 'failed' }); this.queues.pause(record.id, true);
+      this.activity.update(record.id, runId, { status: 'failed' });
+      this.queues.pause(record.id, true);
       this.errors.set(record.id, error instanceof Error ? error.message : String(error));
     } finally {
-      this.running.delete(record.id); this.tools.delete(record.id);
+      this.running.delete(record.id);
+      this.tools.delete(record.id);
       const session = this.sessions.get(record.id);
-      this.store.update(record.id, { contextUsage: session?.getContextUsage(), modelName: session?.model ? `${session.model.provider}/${session.model.id}` : record.modelName }); this.publish(record);
+      this.store.update(record.id, {
+        contextUsage: session?.getContextUsage(),
+        modelName: session?.model
+          ? `${session.model.provider}/${session.model.id}`
+          : record.modelName,
+      });
+      this.publish(record);
       queueMicrotask(() => this.drain(record));
     }
   }
   private async command(record: ChatRecord, session: AgentSession, text: string) {
-    const [command, ...parts] = text.split(/\s+/); const args = parts.join(' ');
+    const [command, ...parts] = text.split(/\s+/);
+    const args = parts.join(' ');
     let result: string;
     if (command === '/subagent') {
-      if (args && !['on', 'off', 'status'].includes(args)) throw new Error('Usage: /subagent [on|off|status]. Enable, then describe your research task.');
+      if (args && !['on', 'off', 'status'].includes(args))
+        throw new Error(
+          'Usage: /subagent [on|off|status]. Enable, then describe your research task.',
+        );
       if (args !== 'status') this.store.update(record.id, { subagentsEnabled: args !== 'off' });
-      session.setActiveToolsByName(session.getActiveToolNames().filter(name => name !== 'subagent').concat(record.subagentsEnabled ? ['subagent'] : []));
+      session.setActiveToolsByName(
+        session
+          .getActiveToolNames()
+          .filter((name) => name !== 'subagent')
+          .concat(record.subagentsEnabled ? ['subagent'] : []),
+      );
       result = `Research subagents ${record.subagentsEnabled ? 'enabled' : 'disabled'}. ${record.subagentsEnabled ? 'Pi can now delegate focused research via the subagent tool. Children use the current model with read-only tools and additional provider usage.' : ''}`;
     } else if (command === '/compact') {
-      await session.compact(args || undefined); result = 'Conversation compacted.';
+      await session.compact(args || undefined);
+      result = 'Conversation compacted.';
     } else if (command === '/model') {
       const runtime = await this.runtime;
       const models = await runtime.getAvailable();
-      if (args) { const model = models.find(m => `${m.provider}/${m.id}` === args); if (!model) throw new Error('Use /model provider/model-id from the model picker.'); await session.setModel(model); }
+      if (args) {
+        const model = models.find((m) => `${m.provider}/${m.id}` === args);
+        if (!model) throw new Error('Use /model provider/model-id from the model picker.');
+        await session.setModel(model);
+      }
       result = `Model: ${session.model ? `${session.model.provider}/${session.model.id}` : 'none'}`;
     } else if (command === '/thinking') {
-      if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(args)) throw new Error('Usage: /thinking off|minimal|low|medium|high|xhigh');
-      session.setThinkingLevel(args as Parameters<AgentSession['setThinkingLevel']>[0]); result = `Thinking level: ${session.thinkingLevel}`;
-    } else throw new Error(`Unsupported web command: ${command}. Open Commands for supported commands and terminal alternatives.`);
+      if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(args))
+        throw new Error('Usage: /thinking off|minimal|low|medium|high|xhigh');
+      session.setThinkingLevel(args as Parameters<AgentSession['setThinkingLevel']>[0]);
+      result = `Thinking level: ${session.thinkingLevel}`;
+    } else
+      throw new Error(
+        `Unsupported web command: ${command}. Open Commands for supported commands and terminal alternatives.`,
+      );
     const id = this.activity.start(record.id, 'agent', command, result);
     this.activity.update(record.id, id, { status: 'passed' });
   }
   async abort(id: string) {
     this.queues.pause(id, true);
-    const pending = this.loading.get(id); if (pending) await pending;
+    const pending = this.loading.get(id);
+    if (pending) await pending;
     await this.sessions.get(id)?.abort();
-    const record = this.store.get(id); if (record) this.publish(record);
+    const record = this.store.get(id);
+    if (record) this.publish(record);
   }
-  dispose(id: string) { this.sessions.get(id)?.dispose(); this.sessions.delete(id); this.errors.delete(id); }
+  dispose(id: string) {
+    this.sessions.get(id)?.dispose();
+    this.sessions.delete(id);
+    this.errors.delete(id);
+  }
   async shutdown() {
     this.closing = true;
     await Promise.allSettled([...this.loading.values()]);
-    await Promise.allSettled([...this.sessions.values()].map(s => s.abort()));
+    await Promise.allSettled([...this.sessions.values()].map((s) => s.abort()));
     for (const session of this.sessions.values()) session.dispose();
   }
 }

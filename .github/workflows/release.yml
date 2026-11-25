@@ -22,6 +22,7 @@ jobs:
           test "$GITHUB_REF_NAME" = "v$VERSION"
           node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("package.json")); if (!/^\d+\.\d+\.\d+$/.test(p.version)) process.exit(1);'
       - run: npm ci
+      - run: npm run check
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

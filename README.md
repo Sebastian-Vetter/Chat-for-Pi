@@ -53,10 +53,10 @@ Published versions are distributed through **[GitHub Releases](https://github.co
 
 ### Pi-managed installation (macOS)
 
-After release `v1.0.5` is published, install its version-pinned Pi package:
+Choose a published version on the release page and use its version-pinned installation command. For a release tagged `vX.Y.Z`, replace `X.Y.Z` below with that published version:
 
 ```sh
-pi install git:github.com/Sebastian-Vetter/Chat-for-Pi@v1.0.5
+pi install git:github.com/Sebastian-Vetter/Chat-for-Pi@vX.Y.Z
 ```
 
 In Pi:
@@ -264,11 +264,15 @@ Keep only one backend process per data directory. Transcripts and tool output ca
 ## Checks
 
 ```sh
+npm run check     # formatting and strict TypeScript / unused-code checks
+npm run format    # apply the project's formatting rules
 npm test          # metadata, API, SSE, and transcript regression tests
-npm run build     # strict TypeScript check and production frontend build
+npm run build     # typecheck and production frontend build
 npx playwright install chromium
 npm run test:e2e  # isolated desktop/mobile browser tests (ports 5174/13002)
 ```
+
+Formatting is defined in `.prettierrc.json` and enforced by the release workflow. Keep UI components focused on presentation and put reusable process/release logic in the corresponding script modules. Browser checks run with two workers to keep resource usage predictable.
 
 To use an existing Chrome installation instead of Playwright's Chromium on macOS:
 
@@ -301,6 +305,7 @@ Versions started at **1.0.0**. The current version comes from `package.json` and
 
 ```sh
 npm run release -- patch   # Increment the current patch version
+npm run format             # Normalize the updated JSON and source files
 # Or: minor, major, or an explicit higher stable version such as 1.1.0
 ```
 
@@ -308,7 +313,8 @@ This updates package.json, package-lock.json, and the changelog together. It doe
 
 ## Layout
 
-- `src/App.tsx` — conversations, live events, composer, workspace picker
+- `src/App.tsx` — application state, live events, and conversation orchestration
+- `src/MessageView.tsx`, `Welcome.tsx`, `WorkspaceDialog.tsx`, `SessionList.tsx` — focused conversation UI components
 - `src/styles.css` — responsive interface
 - `server/index.ts` — local API, validation, SSE, production static hosting
 - `server/agent.ts` — Pi lifecycle, session restoration, transcript projection
@@ -318,7 +324,11 @@ This updates package.json, package-lock.json, and the changelog together. It doe
 - `src/Inspector.tsx`, `Instructions.tsx` — workspace panels and instruction viewer
 - `src/Preferences.tsx`, `SessionStatus.tsx`, `ThinkingPanel.tsx` — sounds, context, queues, and progress
 - `extensions/chat-server.ts`, `scripts/service.ts` — terminal command and macOS service lifecycle
+- `scripts/process.ts` — bounded, shell-free process execution
+- `scripts/release-info.ts` — shared repository, version validation, artifact names, and install commands
+- `scripts/updates.ts` — bounded GitHub metadata fetching, validation, caching, and rate limits
+- `scripts/package.ts`, `verify-package.ts` — release archives and clean-install verification
 - `scripts/release.ts`, `CHANGELOG.md` — version/release preparation and release notes
 - `server/*.test.ts`, `scripts/*.test.ts`, `extensions/*.test.ts`, `tests/` — unit/API and browser checks
 
-Work is recorded as small commits. The initial implementation commits are on `main`; the current working branch is `dev`. The repository currently has an `origin` remote at `https://github.com/Sebastian-Vetter/Chat-for-Pi.git`. No deployment is configured by this app.
+Work is recorded as small commits. The initial implementation commits are on `main`; the current working branch is `dev`. The repository currently has an `origin` remote at `https://github.com/Sebastian-Vetter/Chat-for-Pi.git`. The version-tagged GitHub Actions workflow publishes release downloads; no hosted web-app deployment is configured.

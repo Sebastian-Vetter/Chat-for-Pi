@@ -4,6 +4,24 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-11-25
+
+### Changed
+
+- Applied consistent, readable formatting across TypeScript, React, CSS, tests, and configuration. Added reusable formatter/typecheck commands, unused-code checks, and release-workflow quality checks.
+- Split message rendering, welcome prompts, workspace selection, and session-list presentation out of the main app while preserving sidebar state and existing interactions. Removed repeated stop-request and derived-state logic.
+- Consolidated release URLs, stable-version validation, artifact names, and Pi install commands into one shared module. Separated bounded process execution from macOS service management.
+- Restructured update checking into bounded response reading, metadata validation, cache policy, and fetch/error handling; replaced untyped external metadata with explicit unknown-value validation.
+- Replaced the distribution extension's long conditional dispatcher with focused command handlers, and split packaging into named preparation, archive, checksum, and release-note steps. Existing confirmations, data isolation, and opt-out behavior are preserved.
+
+### Fixed
+
+- Ordinary prompts such as `constructor` and `toString` no longer collide with inherited object properties in the web command dispatcher. Regression coverage intercepts submissions without making provider calls.
+
+### Tests
+
+- Added regression coverage for shared release metadata and shell-free process execution. Included formatter configuration in standalone application packages and documented the development quality workflow.
+
 ## [1.0.5] - 2026-11-25
 
 ### Added
