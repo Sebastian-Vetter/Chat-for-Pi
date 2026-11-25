@@ -68,7 +68,7 @@ export default function App() {
     return () => source.close();
   }, [active]);
   useEffect(() => {
-    if (follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
+    if (snapshot?.messages.length && follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [snapshot, sending]);
   useEffect(() => { if (textarea.current) { textarea.current.style.height = 'auto'; textarea.current.style.height = `${Math.min(textarea.current.scrollHeight, 180)}px`; } }, [draft]);
   function newChat() { setActive(null); setDraft(''); setError(''); setLoading(false); if (window.innerWidth <= 760) setSidebar(false); textarea.current?.focus(); }

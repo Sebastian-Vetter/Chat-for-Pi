@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import type { ChatRecord, ChatStore } from './store.js';
 
 export interface DisplayMessage { role: string; text: string; toolName?: string; isError?: boolean }
-export function displayMessages(messages: readonly unknown[]): DisplayMessage[] {
-  return messages.flatMap(raw => {
+export function displayMessages(messages: readonly unknown[], streamingMessage?: unknown): DisplayMessage[] {
+  return [...messages, ...(streamingMessage ? [streamingMessage] : [])].flatMap(raw => {
     const message = raw as { role: string; content?: string | { type: string; text?: string }[]; toolName?: string; isError?: boolean; errorMessage?: string };
     if (!['user', 'assistant', 'toolResult'].includes(message.role)) return [];
     const text = typeof message.content === 'string' ? message.content : (message.content ?? []).filter(c => c.type === 'text').map(c => c.text ?? '').join('\n');
@@ -26,7 +26,7 @@ export class AgentService {
   snapshot(record: ChatRecord) {
     const session = this.sessions.get(record.id);
     const messages = session?.messages ?? (record.sessionFile && existsSync(record.sessionFile) ? SessionManager.open(record.sessionFile).buildSessionContext().messages : []);
-    return { chat: record, messages: displayMessages(messages), busy: this.busy(record.id), tool: this.tools.get(record.id), error: this.errors.get(record.id), model: session?.model ? `${session.model.provider}/${session.model.id}` : undefined };
+    return { chat: record, messages: displayMessages(messages, session?.state.streamingMessage), busy: this.busy(record.id), tool: this.tools.get(record.id), error: this.errors.get(record.id), model: session?.model ? `${session.model.provider}/${session.model.id}` : undefined };
   }
   subscribe(id: string, fn: (event: unknown) => void) {
     const group = this.listeners.get(id) ?? new Set(); group.add(fn); this.listeners.set(id, group);
