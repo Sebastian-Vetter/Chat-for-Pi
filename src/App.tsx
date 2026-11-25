@@ -43,6 +43,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [piSessionsOpen, setPiSessionsOpen] = useState(false);
   const [preferences, setPreferences] = useState(readPreferences);
+  const [soundNotice, setSoundNotice] = useState('');
   const preferencesRef = useRef(preferences); preferencesRef.current = preferences;
   const [runningChats, setRunningChats] = useState<Record<string, boolean>>({});
   const runningRef = useRef<Record<string, boolean>>({});
@@ -79,7 +80,7 @@ export default function App() {
       const chat = data.chat as { id: string; busy: boolean; error?: string };
       const wasRunning = runningRef.current[chat.id];
       runningRef.current = { ...runningRef.current, [chat.id]: chat.busy }; setRunningChats(runningRef.current);
-      if (wasRunning && !chat.busy && !chat.error && preferencesRef.current.finishSound) void playFinishSound(preferencesRef.current).catch(() => {});
+      if (wasRunning && !chat.busy && !chat.error && preferencesRef.current.finishSound) void playFinishSound(preferencesRef.current).catch(() => setSoundNotice('Your response is finished, but the browser could not play the chime. Open audio settings and click Preview sound to allow playback.'));
     };
     window.addEventListener('pointerdown', unlockSound, { once: true });
     window.addEventListener('keydown', unlockSound, { once: true });
@@ -161,6 +162,7 @@ export default function App() {
         {!messages.length && !loading ? <section className="welcome"><div className="welcome-label"><span />YOUR IDEAS. YOUR WORKSPACE.</div><div className="welcome-logo">π<span /></div><h1>What will we build<span>today?</span></h1><p>A conversation away from your next idea.<br />Write, explore, and build with Pi in your own workspace.</p><div className="starters">{starters.map(item => <button key={item.title} onClick={() => { setDraft(item.text); textarea.current?.focus(); }}><item.icon size={20} /><strong>{item.title}</strong><span>{item.text}</span><span className="starter-arrow">↗</span></button>)}</div><div className="welcome-note"><Folder size={13} />Working in <button onClick={() => setWorkspaceOpen(true)}>{(currentChat?.cwd ?? cwd).replace(/^\/Users\/[^/]+/, '~') || 'your workspace'}</button></div></section> : <section className="transcript" aria-label="Chat messages">{loading && <div className="status-line"><LoaderCircle size={16} className="spin" />Loading conversation…</div>}{messages.map((message, index) => <MessageView key={index} message={message} />)}{busy && <div className="status-line" role="status"><LoaderCircle size={15} className="spin" />{snapshot?.tool ? `Running ${snapshot.tool}…` : 'Pi is working…'}</div>}</section>}
       </div>
       <div className="composer-area">{(error || snapshot?.error) && <div className="error-banner" role="alert">{error || snapshot?.error}<button className="icon-button" aria-label="Dismiss error" onClick={() => { setError(''); setSnapshot(s => s ? { ...s, error: undefined } : s); }}><X size={14} /></button></div>}{active && !connected && <div className="connection-notice" role="status">Connecting to your session… If the server stopped, restart it with npm run dev.</div>}
+        {soundNotice && <div className="sound-notice" role="status"><span>{soundNotice}</span><button onClick={() => setSettingsOpen(true)}>Audio settings</button><button className="icon-button" aria-label="Dismiss audio notice" onClick={() => setSoundNotice('')}><X size={13} /></button></div>}
         <ThinkingPanel snapshot={snapshot} />
         <PromptQueue snapshot={snapshot} onError={setError} />
         <form className="composer" onSubmit={e => void send(e)}><textarea ref={textarea} aria-label="Message Pi" placeholder={snapshot?.busy ? 'Write your next prompt — it will be queued…' : 'Ask Pi anything, or describe what you want to build…'} rows={2} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} /><div className="composer-toolbar"><div className="model-picker"><Sparkles size={14} /><select aria-label="Model" value={selectedModel} disabled={busy || !config} onChange={e => setModel(e.target.value)}><option value="">Pi default model</option>{config?.models.map(m => <option value={m.key} key={m.key}>{m.name} · {m.provider}</option>)}</select><ChevronDown size={12} /></div><div className="composer-right"><span className="enter-hint">{snapshot?.busy ? '↵ to queue' : '↵ to send'} · ⇧ ↵ newline</span>{busy && !!draft.trim() && <button type="submit" className="queue-send" aria-label="Queue prompt" disabled={sending || !connected}>Queue <Plus size={13} /></button>}{busy ? <button type="button" className="send-button stop-button" aria-label="Stop response" onClick={() => { if (active) void api(`/chats/${active}/stop`, { method: 'POST', body: '{}' }).catch(e => setError(errorText(e))); }}><Square size={16} fill="currentColor" /></button> : <button className="send-button" type="submit" aria-label="Send message" disabled={!draft.trim() || !config || loading || (!!active && !connected)}><ArrowUp size={20} /></button>}</div></div></form>
@@ -168,7 +170,7 @@ export default function App() {
       </div>
     </main>
     {inspectorOpen && <Inspector chatId={active} events={snapshot?.events ?? []} close={() => setInspectorOpen(false)} />}
-    {settingsOpen && <SettingsDialog value={preferences} version={config?.version} save={setPreferences} close={() => setSettingsOpen(false)} />}
+    {settingsOpen && <SettingsDialog value={preferences} version={config?.version} save={next => { setPreferences(next); setSoundNotice(''); }} close={() => setSettingsOpen(false)} />}
     {piSessionsOpen && <PiSessionBrowser close={() => setPiSessionsOpen(false)} imported={chat => { setChats(current => [chat, ...current]); selectChat(chat.id); setPiSessionsOpen(false); if (window.innerWidth <= 760) setSidebar(false); }} />}
     {workspaceOpen && <WorkspaceDialog value={currentChat?.cwd ?? cwd} locked={!!active} close={() => setWorkspaceOpen(false)} save={value => { setCwd(value); setWorkspaceOpen(false); }} />}
     <KeyboardShortcut action={newChat} />

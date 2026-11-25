@@ -4,6 +4,11 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+### Fixed
+
+- Finish sounds now default to enabled and play automatically after an AI response finishes. Explicitly disabled settings remain respected.
+- Blocked browser audio now shows a notice with an Audio settings action instead of silently dropping the completion chime.
+
 ## [1.0.0] - 2026-11-25
 
 ### Added
