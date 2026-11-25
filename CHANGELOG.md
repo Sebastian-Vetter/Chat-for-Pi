@@ -4,6 +4,14 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-25
+
+### Added
+
+- Persistent session archive with sidebar browsing and restore controls, preserving conversation history, workspace files, and active runs.
+- Hide/Show session list control with a browser-persisted preference, replacing the “Your conversations” heading.
+- Archive API validation, persistence checks, and desktop/mobile archive/restore and list-visibility regression tests.
+
 ## [1.0.3] - 2026-11-25
 
 ### Documentation

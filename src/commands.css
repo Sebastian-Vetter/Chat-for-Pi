@@ -1,3 +1,7 @@
+.session-list-controls { display: flex; align-items: center; justify-content: space-between; margin: 16px 4px 0; gap: 6px; }
+.session-list-controls button { display: inline-flex; align-items: center; gap: 7px; color: #919895; font-size: 11px; padding: 8px 4px; }
+.session-list-controls button:hover { color: #c5e6b6; }
+.session-list-controls span { font-size: 10px; opacity: .65; }
 .web-command-result { max-width: 760px; margin: 16px auto; padding: 12px 20px; font-size: 13px; border-left: 2px solid #8885; }
 .web-command-result p { margin-bottom: 0; opacity: .8; }
 .commands-button { background: none; border: 0; color: var(--text-muted, #888); cursor: pointer; white-space: nowrap; font: inherit; font-size: 12px; }

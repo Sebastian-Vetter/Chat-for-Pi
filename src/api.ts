@@ -1,4 +1,4 @@
-export interface Chat { subagentsEnabled?: boolean; id: string; title: string; cwd: string; createdAt: string; updatedAt: string }
+export interface Chat { archived?: boolean; subagentsEnabled?: boolean; id: string; title: string; cwd: string; createdAt: string; updatedAt: string }
 export interface Message { role: string; text: string; toolName?: string; isError?: boolean }
 export interface ActivityEvent { id: string; type: 'agent' | 'tool' | 'test'; label: string; status: 'running' | 'passed' | 'failed' | 'stopped' | 'interrupted'; timestamp: string; durationMs?: number; detail?: string }
 export interface QueuedPrompt { id: string; text: string; model?: string; timestamp: string }

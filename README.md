@@ -130,6 +130,7 @@ Click **Commands /** below the composer or type `/help` to see supported command
 - Persistent conversations with their own Pi session and working directory
 - Live assistant text, tool output, busy indicators, and stop controls
 - Search, rename, delete, and reopen conversations
+- Archive sessions without deleting history; open Session archive in the sidebar to browse or restore them. Archiving does not stop active runs or queues. The sidebar's Hide/Show session list toggle remembers your preference in this browser.
 - Model picker using providers available in your Pi configuration
 - Markdown, fenced code, tables, and copy-message controls
 - Responsive dark interface and mobile sidebar

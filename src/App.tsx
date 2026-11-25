@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowUp, Check, ChevronDown, Code2, Copy, Folder, LoaderCircle, Menu, MessageSquare, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Sparkles, Square, Terminal, Trash2, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowUp, Check, ChevronDown, Code2, Copy, Folder, LoaderCircle, Menu, MessageSquare, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Sparkles, Square, Terminal, Trash2, X } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, type Chat, type Config, type Message, type Snapshot } from './api';
@@ -40,6 +40,8 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [draft, setDraft] = useState('');
   const [search, setSearch] = useState('');
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [sessionsHidden, setSessionsHidden] = useState(() => localStorage.getItem('pi-chat-sessions-hidden') === 'true');
   const [model, setModel] = useState('');
   const [cwd, setCwd] = useState('');
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -146,6 +148,13 @@ export default function App() {
     try { await api(`/chats/${chat.id}`, { method: 'PATCH', body: JSON.stringify({ title }) }); await refreshChats(); }
     catch (e) { setError(errorText(e)); }
   }
+  async function archive(chat: Chat) {
+    try {
+      await api(`/chats/${chat.id}`, { method: 'PATCH', body: JSON.stringify({ archived: !chat.archived }) });
+      if (!chat.archived && active === chat.id) newChat();
+      await refreshChats();
+    } catch (e) { setError(errorText(e)); }
+  }
   async function remove(chat: Chat) {
     if (!window.confirm(`Delete “${chat.title}”? This removes its local conversation history, not workspace files.`)) return;
     try { await api(`/chats/${chat.id}`, { method: 'DELETE', body: '{}' }); if (active === chat.id) newChat(); await refreshChats(); }
@@ -154,18 +163,18 @@ export default function App() {
   const currentChat = chats.find(chat => chat.id === active);
   const messages = snapshot?.messages ?? [];
   const selectedModel = model || snapshot?.model || '';
-  const visibleChats = chats.filter(chat => `${chat.title} ${chat.cwd}`.toLowerCase().includes(search.toLowerCase()));
+  const visibleChats = chats.filter(chat => !!chat.archived === archiveOpen).filter(chat => `${chat.title} ${chat.cwd}`.toLowerCase().includes(search.toLowerCase()));
   return <div className="app-shell">
     {sidebar && <><button className="sidebar-scrim" aria-label="Close sidebar" onClick={() => setSidebar(false)} /><aside className="sidebar">
       <div className="brand-row"><a className="brand" href="/" onClick={e => { e.preventDefault(); newChat(); }}><span className="brand-mark">π</span>Chat<span className="brand-badge">for Pi</span></a><button className="icon-button" aria-label="Close sidebar" onClick={() => setSidebar(false)}><PanelLeftClose size={18} /></button></div>
       <button className="new-chat" onClick={newChat}><Plus size={18} />New chat<span>{mac ? '⌘ K' : 'Ctrl K'}</span></button>
       <button className="browse-pi" onClick={() => setPiSessionsOpen(true)}><Terminal size={14} />Browse existing Pi sessions</button>
-      <label className="search-box"><Search size={15} /><input aria-label="Search chats" placeholder="Search conversations" value={search} onChange={e => setSearch(e.target.value)} /></label>
-      <div className="history-heading">YOUR CONVERSATIONS <span>{chats.length}</span></div>
-      <nav className="chat-list" aria-label="Conversations">{visibleChats.length ? visibleChats.map(chat => <div className={`chat-item ${active === chat.id ? 'active' : ''}`} key={chat.id}>
+      <div className="session-list-controls"><button aria-label={archiveOpen ? 'Show active sessions' : 'Open session archive'} aria-pressed={archiveOpen} onClick={() => { setArchiveOpen(value => !value); setSearch(''); setSessionsHidden(false); localStorage.setItem('pi-chat-sessions-hidden', 'false'); }}><Archive size={14} />{archiveOpen ? 'Back to sessions' : 'Session archive'} <span>{chats.filter(chat => chat.archived).length}</span></button><button aria-label={sessionsHidden ? 'Show session list' : 'Hide session list'} aria-expanded={!sessionsHidden} onClick={() => { const hidden = !sessionsHidden; setSessionsHidden(hidden); localStorage.setItem('pi-chat-sessions-hidden', String(hidden)); }}><ChevronDown size={15} style={{ transform: sessionsHidden ? 'rotate(-90deg)' : undefined }} /></button></div>
+      {!sessionsHidden && <label className="search-box"><Search size={15} /><input aria-label="Search chats" placeholder="Search conversations" value={search} onChange={e => setSearch(e.target.value)} /></label>}
+      <nav className="chat-list" aria-label={archiveOpen ? 'Archived sessions' : 'Conversations'}>{!sessionsHidden && <>{visibleChats.length ? visibleChats.map(chat => <div className={`chat-item ${active === chat.id ? 'active' : ''}`} key={chat.id}>
         <button className="chat-select" title={chat.cwd} onClick={() => { selectChat(chat.id); setError(''); if (window.innerWidth <= 760) setSidebar(false); }}>{runningChats[chat.id] ? <LoaderCircle size={15} className="spin" /> : <MessageSquare size={15} />}<span>{chat.title}</span></button>
-        <div className="chat-item-actions"><button className="icon-button" aria-label={`Rename ${chat.title}`} onClick={() => void rename(chat)}><MoreHorizontal size={14} /></button><button className="icon-button" aria-label={`Delete ${chat.title}`} onClick={() => void remove(chat)}><Trash2 size={13} /></button></div>
-      </div>) : <div className="empty-history">{search ? 'No matching conversations.' : 'A little space for your next big idea. Start a conversation.'}</div>}</nav>
+        <div className="chat-item-actions"><button className="icon-button" aria-label={`${chat.archived ? 'Restore' : 'Archive'} ${chat.title}`} onClick={() => void archive(chat)}>{chat.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}</button><button className="icon-button" aria-label={`Rename ${chat.title}`} onClick={() => void rename(chat)}><MoreHorizontal size={14} /></button><button className="icon-button" aria-label={`Delete ${chat.title}`} onClick={() => void remove(chat)}><Trash2 size={13} /></button></div>
+      </div>) : <div className="empty-history">{search ? (archiveOpen ? 'No matching archived sessions.' : 'No matching conversations.') : archiveOpen ? 'No archived sessions.' : 'A little space for your next big idea. Start a conversation.'}</div>}</>}</nav>
       <InstructionFiles chatId={active} />
       <div className="sidebar-footer"><span className="local-dot" /><div><strong>Your local workspace</strong><small>{Object.values(runningChats).filter(Boolean).length ? `${Object.values(runningChats).filter(Boolean).length} sessions running` : 'Powered by Pi coding agent'}</small><button className="version-label" title="Version and settings" onClick={() => setSettingsOpen(true)}>v{appVersion}</button></div><button className="icon-button sidebar-settings" aria-label="Open settings" title={mac ? 'Settings (⌘ ,)' : 'Settings (Ctrl ,)'} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button></div>
     </aside></>}

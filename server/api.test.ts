@@ -40,6 +40,13 @@ test('local API validates requests and persists a chat lifecycle', { timeout: 45
     await reader.cancel();
     await request(`/chats/${chat.id}`, 'PATCH', { title: 'Renamed chat' });
     assert.equal((await (await request('/chats')).json())[0].title, 'Renamed chat');
+    assert.equal((await request(`/chats/${chat.id}`, 'PATCH', { archived: 'yes' })).status, 400);
+    assert.equal((await request(`/chats/${chat.id}`, 'PATCH', { archived: true, title: 'Ignored' })).status, 400);
+    assert.equal((await request(`/chats/${chat.id}`, 'PATCH', { archived: true })).status, 200);
+    assert.equal((await (await request('/chats')).json())[0].archived, true);
+    assert.deepEqual((await (await request(`/chats/${chat.id}`)).json()).messages, []);
+    assert.equal((await request(`/chats/${chat.id}`, 'PATCH', { archived: false })).status, 200);
+    assert.equal((await (await request('/chats')).json())[0].archived, false);
     assert.equal((await request(`/chats/${chat.id}`, 'DELETE', {})).status, 200);
     assert.equal((await request(`/chats/${chat.id}`)).status, 404);
     assert.deepEqual(await (await request('/chats')).json(), []);
