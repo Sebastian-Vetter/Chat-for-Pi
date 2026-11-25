@@ -1,0 +1,31 @@
+/* Motion is decorative: no interaction or content depends on an animation finishing. */
+@keyframes chat-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes chat-slide { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes chat-dialog { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes chat-glow { 0%,100% { box-shadow: 0 0 0 0 #c5e6b600; } 50% { box-shadow: 0 0 35px 5px #c5e6b60b; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar { animation: chat-slide .24s ease-out both; }
+  .welcome-label { animation: chat-rise .45s ease-out both; }
+  .welcome-logo { animation: chat-rise .5s .06s ease-out both, chat-glow 4s .6s ease-in-out 2; }
+  .welcome h1 { animation: chat-rise .5s .12s ease-out both; }
+  .welcome > p { animation: chat-rise .5s .18s ease-out both; }
+  .starters button { animation: chat-rise .45s .24s ease-out both; }
+  .starters button:nth-child(2) { animation-delay: .31s; }
+  .starters button:nth-child(3) { animation-delay: .38s; }
+  .welcome-note { animation: chat-rise .45s .43s ease-out both; }
+  .message, .tool-result, .activity-event, .pipeline-run { animation: chat-rise .22s ease-out; }
+  .workspace-dialog[open], .diff-dialog[open] { animation: chat-dialog .2s ease-out both; }
+  .tool-result[open] pre { animation: chat-rise .18s ease-out; }
+  .inspector { animation: chat-rise .24s ease-out; }
+  .status-line, .error-banner, .connection-notice { animation: chat-rise .2s ease-out; }
+  .send-button { transition: transform .18s ease, background .18s ease, box-shadow .18s ease; }
+  .send-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 16px #b5d7a51c; }
+  .send-button:active:not(:disabled) { transform: scale(.92); }
+  .icon-button, .workspace-button, .new-chat, .chat-item, .primary-button, .secondary-button { transition: color .15s ease, background .15s ease, border-color .15s ease; }
+  .message-actions { transition: opacity .15s ease; }
+  .model-picker svg, .workspace-button svg { transition: color .15s ease; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .starters button:hover, .send-button:hover:not(:disabled), .send-button:active:not(:disabled) { transform: none; }
+}
