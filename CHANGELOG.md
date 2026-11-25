@@ -4,6 +4,33 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-11-25
+
+### Changed
+
+- Applied consistent, readable formatting across TypeScript, React, CSS, tests, and configuration. Added reusable formatter/typecheck commands, unused-code checks, and release-workflow quality checks.
+- Split message rendering, welcome prompts, workspace selection, and session-list presentation out of the main app while preserving sidebar state and existing interactions. Removed repeated stop-request and derived-state logic.
+- Consolidated release URLs, stable-version validation, artifact names, and Pi install commands into one shared module. Separated bounded process execution from macOS service management.
+- Restructured update checking into bounded response reading, metadata validation, cache policy, and fetch/error handling; replaced untyped external metadata with explicit unknown-value validation.
+- Replaced the distribution extension's long conditional dispatcher with focused command handlers, and split packaging into named preparation, archive, checksum, and release-note steps. Existing confirmations, data isolation, and opt-out behavior are preserved.
+
+### Fixed
+
+- Ordinary prompts such as `constructor` and `toString` no longer collide with inherited object properties in the web command dispatcher. Regression coverage intercepts submissions without making provider calls.
+
+### Tests
+
+- Added regression coverage for shared release metadata and shell-free process execution. Included formatter configuration in standalone application packages and documented the development quality workflow.
+
+## [1.0.5] - 2026-11-25
+
+### Added
+
+- Installable Pi package manifest and a dependency-free distribution extension with confirmed `/chat-server install` and `/chat-server updates` commands. Managed application/data paths are independent of Pi's package cache; updates stage and build before switching, preserve sessions, and retain rollback code without automatically stopping services.
+- Release packaging with Pi-package and standalone-app downloads, SHA-256 checksums, release notes, and an isolated clean-install verification command. A version-tagged GitHub Actions workflow tests and publishes GitHub Release assets; npm registry publication is not required.
+- Automatic hourly public stable-release checks, an available-version banner, release notes/downloads and explicit update instructions under Settings → Updates & releases. Checks have timeouts, caching, rate limiting, offline/error states, and an opt-out; no prompts, workspace paths, or credentials are sent.
+- Regression tests for update metadata validation, cache/rate limits, installer data preservation and failures, API safety, and desktop/mobile update notices. Tests disable real online release checks and live-provider calls remain opt-in. Browser workers are capped at two for reliable release verification, and archive fixtures use unique titles and wait for the rendered app.
+
 ## [1.0.4] - 2026-11-25
 
 ### Added
