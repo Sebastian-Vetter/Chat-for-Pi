@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 export interface ChatRecord {
   id: string; title: string; cwd: string; createdAt: string; updatedAt: string; sessionFile?: string;
+  archived?: boolean; subagentsEnabled?: boolean;
   contextUsage?: { tokens: number | null; contextWindow: number; percent: number | null }; modelName?: string;
 }
 export class ChatStore {
@@ -21,7 +22,7 @@ export class ChatStore {
     const record: ChatRecord = { id: randomUUID(), title: 'New chat', cwd, createdAt: now, updatedAt: now };
     this.records.push(record); this.save(); return record;
   }
-  update(id: string, values: Partial<Pick<ChatRecord, 'title' | 'sessionFile' | 'contextUsage' | 'modelName'>>) {
+  update(id: string, values: Partial<Pick<ChatRecord, 'title' | 'sessionFile' | 'contextUsage' | 'modelName' | 'subagentsEnabled' | 'archived'>>) {
     const record = this.get(id);
     if (!record) throw new Error('Chat not found');
     Object.assign(record, values, { updatedAt: new Date().toISOString() });

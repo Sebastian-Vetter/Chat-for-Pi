@@ -49,12 +49,24 @@ Follow the Run section below from this repository. Chat uses the Pi configuratio
 
 ## Run
 
-Use Node.js 22.19 or newer. Run commands from this directory:
+Use Node.js 22.19 or newer. For a fresh checkout:
 
 ```sh
+git clone --branch dev https://github.com/Sebastian-Vetter/Chat-for-Pi.git
+cd Chat-for-Pi
 npm install
 npm run dev
 ```
+
+To update an existing checkout, run from its repository directory:
+
+```sh
+git switch dev
+git pull --ff-only origin dev
+npm install
+```
+
+Keep any local changes safe before switching branches or pulling. `--ff-only` refuses divergent history instead of creating an unexpected merge. After updating, restart your development server, or run `npm run build` before starting the production server. If you use the background service, run `npm run server:restart` to rebuild and reload it; this interrupts active runs.
 
 Open **http://127.0.0.1:5173**. The API runs on port 3001. Both servers bind only to loopback.
 
@@ -100,11 +112,25 @@ The backend uses `@earendil-works/pi-coding-agent` directly, including your exis
 
 Terminal-only extensions, skills, prompt templates, themes, and MCP integrations are intentionally disabled in this first web host. Standard Pi tools and workspace context discovery are available. The app does not execute the Pi CLI as a subprocess.
 
+## Web commands and research subagents
+
+Click **Commands /** below the composer or type `/help` to see supported commands.
+
+- `/subagent` or `/subagent on` enables AI research delegation for this conversation. Then send a normal prompt such as “Use subagents to investigate the API and frontend independently, then summarize the risks.” Pi decides when to call the research tool; enabling it alone does not make a provider request.
+- `/subagent off` disables future delegation; `/subagent status` reports the setting. The setting survives reloads.
+- Children use the parent's current model and credentials, an independent context, and only `read`, `grep`, `find`, and `ls`. They cannot edit files, run a shell, or recursively delegate. The parent supplies the research question and receives the findings. Up to three children may run per conversation, each with a three-minute timeout. Provider calls can cost extra. Read-only tools are not a filesystem sandbox.
+- The **Research subagents** panel shows task/progress, status, duration, and final findings or errors. Only observable activity and output are shown, never private reasoning. Stop cancels the parent and its active children. Activity survives reloads; unfinished work is marked interrupted after a server restart.
+- `/compact [instructions]`, `/model [provider/model-id]`, and `/thinking off|minimal|low|medium|high|xhigh` control the SDK session. Model capabilities may clamp the thinking level.
+- `/stop`, `/new`, `/settings`, `/resume`, and `/diff` invoke their web equivalents. Session import creates an independent copy, not a mutation of terminal history.
+
+**This is not complete terminal command parity.** Interactive login/logout, package management, terminal extensions, themes, session trees, export, shell shortcuts, and other TUI-only commands still require Pi in a terminal. Unsupported slash commands are rejected, not sent to a model or executed as shell commands. Arbitrary terminal extensions remain disabled for compatibility and safety.
+
 ## Included
 
 - Persistent conversations with their own Pi session and working directory
 - Live assistant text, tool output, busy indicators, and stop controls
 - Search, rename, delete, and reopen conversations
+- Archive sessions without deleting history; open Session archive in the sidebar to browse or restore them. Archiving does not stop active runs or queues. The sidebar's Hide/Show session list toggle remembers your preference in this browser.
 - Model picker using providers available in your Pi configuration
 - Markdown, fenced code, tables, and copy-message controls
 - Responsive dark interface and mobile sidebar
@@ -189,10 +215,12 @@ Paths are resolved relative to the directory where the server starts. `CHAT_API_
 
 ## Versions and changelog
 
-The starting version is **1.0.0**, read from `package.json` and displayed at the bottom-left of the sidebar and in Settings. See [CHANGELOG.md](CHANGELOG.md). Add release notes under its Unreleased heading before preparing the next version:
+Versions started at **1.0.0**. The current version comes from `package.json` and is included in the frontend build, displayed at the bottom-left of the sidebar and in Settings. The UI therefore shows the newly built version after a browser refresh without requiring a backend restart just to update the label.
+
+**Every shipped change gets a version bump and a matching [CHANGELOG.md](CHANGELOG.md) entry.** Use patch bumps by default, and choose minor/major bumps intentionally for feature/breaking releases. Add release notes under Unreleased before preparing each version:
 
 ```sh
-npm run release -- patch   # 1.0.0 → 1.0.1
+npm run release -- patch   # Increment the current patch version
 # Or: minor, major, or an explicit higher stable version such as 1.1.0
 ```
 

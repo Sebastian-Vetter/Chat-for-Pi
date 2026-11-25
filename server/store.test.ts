@@ -11,10 +11,13 @@ test('chat metadata survives reload, rename, and delete', () => {
   try {
     const store = new ChatStore(dir);
     const chat = store.create('/tmp');
-    store.update(chat.id, { title: 'Build Chat', sessionFile: '/tmp/session.jsonl' });
+    store.update(chat.id, { title: 'Build Chat', sessionFile: '/tmp/session.jsonl', archived: true });
     const reloaded = new ChatStore(dir);
     assert.equal(reloaded.get(chat.id)?.title, 'Build Chat');
     assert.equal(reloaded.get(chat.id)?.sessionFile, '/tmp/session.jsonl');
+    assert.equal(reloaded.get(chat.id)?.archived, true);
+    reloaded.update(chat.id, { archived: false });
+    assert.equal(new ChatStore(dir).get(chat.id)?.archived, false);
     reloaded.delete(chat.id);
     assert.deepEqual(new ChatStore(dir).list(), []);
   } finally { rmSync(dir, { recursive: true, force: true }); }

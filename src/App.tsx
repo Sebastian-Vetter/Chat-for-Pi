@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowUp, Check, ChevronDown, Code2, Copy, Folder, LoaderCircle, Menu, MessageSquare, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Sparkles, Square, Terminal, Trash2, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowUp, Check, ChevronDown, Code2, Copy, Folder, LoaderCircle, Menu, MessageSquare, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Sparkles, Square, Terminal, Trash2, X } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, type Chat, type Config, type Message, type Snapshot } from './api';
@@ -9,6 +9,10 @@ import SettingsDialog, { readPreferences, playFinishSound, unlockSound } from '.
 import PiSessionBrowser from './PiSessions';
 import { ContextMeter, PromptQueue } from './SessionStatus';
 import ThinkingPanel from './ThinkingPanel';
+import Commands from './Commands';
+import Subagents from './Subagents';
+import './commands.css';
+import { version as appVersion } from '../package.json';
 
 const starters = [
   { icon: Code2, title: 'Build something new', text: 'Help me plan and build a new application in this workspace.' },
@@ -36,13 +40,17 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [draft, setDraft] = useState('');
   const [search, setSearch] = useState('');
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [sessionsHidden, setSessionsHidden] = useState(() => localStorage.getItem('pi-chat-sessions-hidden') === 'true');
   const [model, setModel] = useState('');
   const [cwd, setCwd] = useState('');
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
   const [piSessionsOpen, setPiSessionsOpen] = useState(false);
   const [preferences, setPreferences] = useState(readPreferences);
+  const [soundNotice, setSoundNotice] = useState('');
   const preferencesRef = useRef(preferences); preferencesRef.current = preferences;
   const [runningChats, setRunningChats] = useState<Record<string, boolean>>({});
   const runningRef = useRef<Record<string, boolean>>({});
@@ -79,7 +87,7 @@ export default function App() {
       const chat = data.chat as { id: string; busy: boolean; error?: string };
       const wasRunning = runningRef.current[chat.id];
       runningRef.current = { ...runningRef.current, [chat.id]: chat.busy }; setRunningChats(runningRef.current);
-      if (wasRunning && !chat.busy && !chat.error && preferencesRef.current.finishSound) void playFinishSound(preferencesRef.current).catch(() => {});
+      if (wasRunning && !chat.busy && !chat.error && preferencesRef.current.finishSound) void playFinishSound(preferencesRef.current).catch(() => setSoundNotice('Your response is finished, but the browser could not play the chime. Open audio settings and click Preview sound to allow playback.'));
     };
     window.addEventListener('pointerdown', unlockSound, { once: true });
     window.addEventListener('keydown', unlockSound, { once: true });
@@ -115,7 +123,15 @@ export default function App() {
   function newChat() { selectChat(null); setDraft(''); setError(''); setLoading(false); if (window.innerWidth <= 760) setSidebar(false); textarea.current?.focus(); }
   async function send(event?: FormEvent) {
     event?.preventDefault();
-    if (!draft.trim() || submitting.current || !config || loading || (!!active && !connected)) return;
+    if (!draft.trim() || submitting.current) return;
+    const command = draft.trim();
+    const localCommands: Record<string, () => void> = {
+      '/help': () => setCommandsOpen(true), '/new': newChat, '/settings': () => setSettingsOpen(true),
+      '/resume': () => setPiSessionsOpen(true), '/diff': () => setInspectorOpen(true),
+      '/stop': () => { if (active) void api(`/chats/${active}/stop`, { method: 'POST', body: '{}' }).catch(e => setError(errorText(e))); },
+    };
+    if (localCommands[command]) { setDraft(''); localCommands[command](); return; }
+    if (!config || loading || (!!active && !connected)) return;
     submitting.current = true; setSending(true); setError(''); follow.current = true;
     const text = draft;
     try {
@@ -132,6 +148,13 @@ export default function App() {
     try { await api(`/chats/${chat.id}`, { method: 'PATCH', body: JSON.stringify({ title }) }); await refreshChats(); }
     catch (e) { setError(errorText(e)); }
   }
+  async function archive(chat: Chat) {
+    try {
+      await api(`/chats/${chat.id}`, { method: 'PATCH', body: JSON.stringify({ archived: !chat.archived }) });
+      if (!chat.archived && active === chat.id) newChat();
+      await refreshChats();
+    } catch (e) { setError(errorText(e)); }
+  }
   async function remove(chat: Chat) {
     if (!window.confirm(`Delete “${chat.title}”? This removes its local conversation history, not workspace files.`)) return;
     try { await api(`/chats/${chat.id}`, { method: 'DELETE', body: '{}' }); if (active === chat.id) newChat(); await refreshChats(); }
@@ -140,35 +163,38 @@ export default function App() {
   const currentChat = chats.find(chat => chat.id === active);
   const messages = snapshot?.messages ?? [];
   const selectedModel = model || snapshot?.model || '';
-  const visibleChats = chats.filter(chat => `${chat.title} ${chat.cwd}`.toLowerCase().includes(search.toLowerCase()));
+  const visibleChats = chats.filter(chat => !!chat.archived === archiveOpen).filter(chat => `${chat.title} ${chat.cwd}`.toLowerCase().includes(search.toLowerCase()));
   return <div className="app-shell">
     {sidebar && <><button className="sidebar-scrim" aria-label="Close sidebar" onClick={() => setSidebar(false)} /><aside className="sidebar">
       <div className="brand-row"><a className="brand" href="/" onClick={e => { e.preventDefault(); newChat(); }}><span className="brand-mark">π</span>Chat<span className="brand-badge">for Pi</span></a><button className="icon-button" aria-label="Close sidebar" onClick={() => setSidebar(false)}><PanelLeftClose size={18} /></button></div>
       <button className="new-chat" onClick={newChat}><Plus size={18} />New chat<span>{mac ? '⌘ K' : 'Ctrl K'}</span></button>
       <button className="browse-pi" onClick={() => setPiSessionsOpen(true)}><Terminal size={14} />Browse existing Pi sessions</button>
-      <label className="search-box"><Search size={15} /><input aria-label="Search chats" placeholder="Search conversations" value={search} onChange={e => setSearch(e.target.value)} /></label>
-      <div className="history-heading">YOUR CONVERSATIONS <span>{chats.length}</span></div>
-      <nav className="chat-list" aria-label="Conversations">{visibleChats.length ? visibleChats.map(chat => <div className={`chat-item ${active === chat.id ? 'active' : ''}`} key={chat.id}>
+      <div className="session-list-controls"><button aria-label={archiveOpen ? 'Show active sessions' : 'Open session archive'} aria-pressed={archiveOpen} onClick={() => { setArchiveOpen(value => !value); setSearch(''); setSessionsHidden(false); localStorage.setItem('pi-chat-sessions-hidden', 'false'); }}><Archive size={14} />{archiveOpen ? 'Back to sessions' : 'Session archive'} <span>{chats.filter(chat => chat.archived).length}</span></button><button aria-label={sessionsHidden ? 'Show session list' : 'Hide session list'} aria-expanded={!sessionsHidden} onClick={() => { const hidden = !sessionsHidden; setSessionsHidden(hidden); localStorage.setItem('pi-chat-sessions-hidden', String(hidden)); }}><ChevronDown size={15} style={{ transform: sessionsHidden ? 'rotate(-90deg)' : undefined }} /></button></div>
+      {!sessionsHidden && <label className="search-box"><Search size={15} /><input aria-label="Search chats" placeholder="Search conversations" value={search} onChange={e => setSearch(e.target.value)} /></label>}
+      <nav className="chat-list" aria-label={archiveOpen ? 'Archived sessions' : 'Conversations'}>{!sessionsHidden && <>{visibleChats.length ? visibleChats.map(chat => <div className={`chat-item ${active === chat.id ? 'active' : ''}`} key={chat.id}>
         <button className="chat-select" title={chat.cwd} onClick={() => { selectChat(chat.id); setError(''); if (window.innerWidth <= 760) setSidebar(false); }}>{runningChats[chat.id] ? <LoaderCircle size={15} className="spin" /> : <MessageSquare size={15} />}<span>{chat.title}</span></button>
-        <div className="chat-item-actions"><button className="icon-button" aria-label={`Rename ${chat.title}`} onClick={() => void rename(chat)}><MoreHorizontal size={14} /></button><button className="icon-button" aria-label={`Delete ${chat.title}`} onClick={() => void remove(chat)}><Trash2 size={13} /></button></div>
-      </div>) : <div className="empty-history">{search ? 'No matching conversations.' : 'A little space for your next big idea. Start a conversation.'}</div>}</nav>
+        <div className="chat-item-actions"><button className="icon-button" aria-label={`${chat.archived ? 'Restore' : 'Archive'} ${chat.title}`} onClick={() => void archive(chat)}>{chat.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}</button><button className="icon-button" aria-label={`Rename ${chat.title}`} onClick={() => void rename(chat)}><MoreHorizontal size={14} /></button><button className="icon-button" aria-label={`Delete ${chat.title}`} onClick={() => void remove(chat)}><Trash2 size={13} /></button></div>
+      </div>) : <div className="empty-history">{search ? (archiveOpen ? 'No matching archived sessions.' : 'No matching conversations.') : archiveOpen ? 'No archived sessions.' : 'A little space for your next big idea. Start a conversation.'}</div>}</>}</nav>
       <InstructionFiles chatId={active} />
-      <div className="sidebar-footer"><span className="local-dot" /><div><strong>Your local workspace</strong><small>{Object.values(runningChats).filter(Boolean).length ? `${Object.values(runningChats).filter(Boolean).length} sessions running` : 'Powered by Pi coding agent'}</small><button className="version-label" title="Version and settings" onClick={() => setSettingsOpen(true)}>v{config?.version ?? '…'}</button></div><button className="icon-button sidebar-settings" aria-label="Open settings" title={mac ? 'Settings (⌘ ,)' : 'Settings (Ctrl ,)'} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button></div>
+      <div className="sidebar-footer"><span className="local-dot" /><div><strong>Your local workspace</strong><small>{Object.values(runningChats).filter(Boolean).length ? `${Object.values(runningChats).filter(Boolean).length} sessions running` : 'Powered by Pi coding agent'}</small><button className="version-label" title="Version and settings" onClick={() => setSettingsOpen(true)}>v{appVersion}</button></div><button className="icon-button sidebar-settings" aria-label="Open settings" title={mac ? 'Settings (⌘ ,)' : 'Settings (Ctrl ,)'} onClick={() => setSettingsOpen(true)}><Settings size={16} /></button></div>
     </aside></>}
     <main className="main-panel">
       <header className="topbar"><div className="topbar-left">{!sidebar && <button className="icon-button" aria-label="Open sidebar" onClick={() => setSidebar(true)}><Menu size={20} /></button>}<span className="page-title">{currentChat?.title ?? 'New conversation'}</span><span className="subtle-pill">Pi agent</span></div><button className="workspace-button" onClick={() => setWorkspaceOpen(true)} title={currentChat?.cwd ?? cwd}><Folder size={14} /><span>{(currentChat?.cwd ?? cwd).split('/').filter(Boolean).at(-1) || 'Workspace'}</span><ChevronDown size={13} /></button><button className={`workspace-tools-button ${inspectorOpen ? 'selected' : ''}`} aria-label="Toggle workspace tools" aria-expanded={inspectorOpen} onClick={() => setInspectorOpen(!inspectorOpen)}><Code2 size={16} /><span>Tools</span></button></header>
+      <PromptQueue snapshot={snapshot} onError={setError} />
       <div className="conversation-scroll" ref={scroll} onScroll={() => { const el = scroll.current; if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>
-        {!messages.length && !loading ? <section className="welcome"><div className="welcome-label"><span />YOUR IDEAS. YOUR WORKSPACE.</div><div className="welcome-logo">π<span /></div><h1>What will we build<span>today?</span></h1><p>A conversation away from your next idea.<br />Write, explore, and build with Pi in your own workspace.</p><div className="starters">{starters.map(item => <button key={item.title} onClick={() => { setDraft(item.text); textarea.current?.focus(); }}><item.icon size={20} /><strong>{item.title}</strong><span>{item.text}</span><span className="starter-arrow">↗</span></button>)}</div><div className="welcome-note"><Folder size={13} />Working in <button onClick={() => setWorkspaceOpen(true)}>{(currentChat?.cwd ?? cwd).replace(/^\/Users\/[^/]+/, '~') || 'your workspace'}</button></div></section> : <section className="transcript" aria-label="Chat messages">{loading && <div className="status-line"><LoaderCircle size={16} className="spin" />Loading conversation…</div>}{messages.map((message, index) => <MessageView key={index} message={message} />)}{busy && <div className="status-line" role="status"><LoaderCircle size={15} className="spin" />{snapshot?.tool ? `Running ${snapshot.tool}…` : 'Pi is working…'}</div>}</section>}
+        {!messages.length && !loading && !busy ? <section className="welcome"><div className="welcome-label"><span />YOUR IDEAS. YOUR WORKSPACE.</div><div className="welcome-logo">π<span /></div><h1>What will we build<span>today?</span></h1><p>A conversation away from your next idea.<br />Write, explore, and build with Pi in your own workspace.</p><div className="starters">{starters.map(item => <button key={item.title} onClick={() => { setDraft(item.text); textarea.current?.focus(); }}><item.icon size={20} /><strong>{item.title}</strong><span>{item.text}</span><span className="starter-arrow">↗</span></button>)}</div><div className="welcome-note"><Folder size={13} />Working in <button onClick={() => setWorkspaceOpen(true)}>{(currentChat?.cwd ?? cwd).replace(/^\/Users\/[^/]+/, '~') || 'your workspace'}</button></div></section> : <section className="transcript" aria-label="Chat messages">{loading && <div className="status-line"><LoaderCircle size={16} className="spin" />Loading conversation…</div>}{messages.map((message, index) => <MessageView key={index} message={message} />)}<ThinkingPanel snapshot={snapshot} /></section>}
+        {snapshot?.events?.filter(event => event.label.startsWith('/') && event.status === 'passed').slice(-1).map(event => <div className="web-command-result" role="status" key={event.id}><strong>{event.label}</strong><p>{event.detail}</p></div>)}
+        <Subagents snapshot={snapshot} />
       </div>
       <div className="composer-area">{(error || snapshot?.error) && <div className="error-banner" role="alert">{error || snapshot?.error}<button className="icon-button" aria-label="Dismiss error" onClick={() => { setError(''); setSnapshot(s => s ? { ...s, error: undefined } : s); }}><X size={14} /></button></div>}{active && !connected && <div className="connection-notice" role="status">Connecting to your session… If the server stopped, restart it with npm run dev.</div>}
-        <ThinkingPanel snapshot={snapshot} />
-        <PromptQueue snapshot={snapshot} onError={setError} />
-        <form className="composer" onSubmit={e => void send(e)}><textarea ref={textarea} aria-label="Message Pi" placeholder={snapshot?.busy ? 'Write your next prompt — it will be queued…' : 'Ask Pi anything, or describe what you want to build…'} rows={2} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} /><div className="composer-toolbar"><div className="model-picker"><Sparkles size={14} /><select aria-label="Model" value={selectedModel} disabled={busy || !config} onChange={e => setModel(e.target.value)}><option value="">Pi default model</option>{config?.models.map(m => <option value={m.key} key={m.key}>{m.name} · {m.provider}</option>)}</select><ChevronDown size={12} /></div><div className="composer-right"><span className="enter-hint">{snapshot?.busy ? '↵ to queue' : '↵ to send'} · ⇧ ↵ newline</span>{busy && !!draft.trim() && <button type="submit" className="queue-send" aria-label="Queue prompt" disabled={sending || !connected}>Queue <Plus size={13} /></button>}{busy ? <button type="button" className="send-button stop-button" aria-label="Stop response" onClick={() => { if (active) void api(`/chats/${active}/stop`, { method: 'POST', body: '{}' }).catch(e => setError(errorText(e))); }}><Square size={16} fill="currentColor" /></button> : <button className="send-button" type="submit" aria-label="Send message" disabled={!draft.trim() || !config || loading || (!!active && !connected)}><ArrowUp size={20} /></button>}</div></div></form>
-        <div className="composer-bottom"><ContextMeter snapshot={snapshot} /><p className="composer-disclaimer">Pi can edit files and run commands. Review important changes.</p></div>
+        {soundNotice && <div className="sound-notice" role="status"><span>{soundNotice}</span><button onClick={() => setSettingsOpen(true)}>Audio settings</button><button className="icon-button" aria-label="Dismiss audio notice" onClick={() => setSoundNotice('')}><X size={13} /></button></div>}
+        <form className={`composer ${busy ? 'composer-working' : ''}`} aria-label="Message composer" aria-busy={busy} onSubmit={e => void send(e)}><span className="sr-only" role="status">{busy ? 'Pi is working.' : ''}</span><textarea ref={textarea} aria-label="Message Pi" placeholder={snapshot?.busy ? 'Write your next prompt — it will be queued…' : 'Ask Pi anything, or describe what you want to build…'} rows={2} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} /><div className="composer-toolbar"><div className="model-picker"><Sparkles size={14} /><select aria-label="Model" value={selectedModel} disabled={busy || !config} onChange={e => setModel(e.target.value)}><option value="">Pi default model</option>{config?.models.map(m => <option value={m.key} key={m.key}>{m.name} · {m.provider}</option>)}</select><ChevronDown size={12} /></div><div className="composer-right"><span className="enter-hint">{snapshot?.busy ? '↵ to queue' : '↵ to send'} · ⇧ ↵ newline</span>{busy && !!draft.trim() && <button type="submit" className="queue-send" aria-label="Queue prompt" disabled={sending || !connected}>Queue <Plus size={13} /></button>}{busy ? <button type="button" className="send-button stop-button" aria-label="Stop response" onClick={() => { if (active) void api(`/chats/${active}/stop`, { method: 'POST', body: '{}' }).catch(e => setError(errorText(e))); }}><Square size={16} fill="currentColor" /></button> : <button className="send-button" type="submit" aria-label="Send message" disabled={!draft.trim() || !config || loading || (!!active && !connected)}><ArrowUp size={20} /></button>}</div></div></form>
+        <div className="composer-bottom"><button type="button" className="commands-button" onClick={() => setCommandsOpen(true)}>Commands /</button><ContextMeter snapshot={snapshot} /><p className="composer-disclaimer">Pi can edit files and run commands. Review important changes.</p></div>
       </div>
     </main>
     {inspectorOpen && <Inspector chatId={active} events={snapshot?.events ?? []} close={() => setInspectorOpen(false)} />}
-    {settingsOpen && <SettingsDialog value={preferences} version={config?.version} save={setPreferences} close={() => setSettingsOpen(false)} />}
+    {commandsOpen && <Commands close={() => setCommandsOpen(false)} choose={command => { setDraft(command); setCommandsOpen(false); textarea.current?.focus(); }} />}
+    {settingsOpen && <SettingsDialog value={preferences} version={appVersion} save={next => { setPreferences(next); setSoundNotice(''); }} close={() => setSettingsOpen(false)} />}
     {piSessionsOpen && <PiSessionBrowser close={() => setPiSessionsOpen(false)} imported={chat => { setChats(current => [chat, ...current]); selectChat(chat.id); setPiSessionsOpen(false); if (window.innerWidth <= 760) setSidebar(false); }} />}
     {workspaceOpen && <WorkspaceDialog value={currentChat?.cwd ?? cwd} locked={!!active} close={() => setWorkspaceOpen(false)} save={value => { setCwd(value); setWorkspaceOpen(false); }} />}
     <KeyboardShortcut action={newChat} />

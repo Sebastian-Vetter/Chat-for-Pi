@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+const version: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 test('workspace: instructions, clickable diff, local tests, activity and paused prompt queue', async ({ page, request }) => {
   const directory = mkdtempSync(join(tmpdir(), 'chat-browser-'));
@@ -56,7 +57,7 @@ test('workspace: instructions, clickable diff, local tests, activity and paused 
 test('settings: version, EV sound presets, Mac shortcuts and reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'v1.0.0', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: `v${version}`, exact: true })).toBeVisible();
   expect(await page.locator('.welcome h1').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
   await page.keyboard.press('Meta+,');
   await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();

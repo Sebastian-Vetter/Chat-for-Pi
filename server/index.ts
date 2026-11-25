@@ -80,6 +80,11 @@ app.post('/api/chats/:id/tests', async (req, res) => {
 });
 app.post('/api/chats/:id/tests/stop', async (req, res) => { await pipelines.stop(req.params.id); res.json({ ok: true }); });
 app.patch('/api/chats/:id', (req, res) => {
+  if (Object.hasOwn(req.body ?? {}, 'archived')) {
+    if (typeof req.body.archived !== 'boolean' || Object.keys(req.body).length !== 1) { res.status(400).json({ error: 'archived must be a boolean and sent on its own' }); return; }
+    const record = store.update(req.params.id, { archived: req.body.archived });
+    agents.publish(record); res.json(record); return;
+  }
   const title = req.body?.title;
   if (typeof title !== 'string' || !title.trim() || title.length > 120) { res.status(400).json({ error: 'Title must be 1–120 characters' }); return; }
   res.json(store.update(req.params.id, { title: title.trim() }));
