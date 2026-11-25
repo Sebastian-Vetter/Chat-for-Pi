@@ -2,6 +2,7 @@ import { createAgentSession, DefaultResourceLoader, getAgentDir, ModelRuntime, S
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatRecord, ChatStore } from './store.js';
+import { conversationInstructions } from './instructions.js';
 
 export interface DisplayMessage { role: string; text: string; toolName?: string; isError?: boolean }
 export function displayMessages(messages: readonly unknown[], streamingMessage?: unknown): DisplayMessage[] {
@@ -23,6 +24,9 @@ export class AgentService {
   private tools = new Map<string, string>();
   constructor(private store: ChatStore) {}
   busy(id: string) { return this.running.has(id); }
+  instructions(record: ChatRecord) {
+    return conversationInstructions(record.cwd, this.sessions.get(record.id)?.resourceLoader.getAgentsFiles().agentsFiles);
+  }
   snapshot(record: ChatRecord) {
     const session = this.sessions.get(record.id);
     const messages = session?.messages ?? (record.sessionFile && existsSync(record.sessionFile) ? SessionManager.open(record.sessionFile).buildSessionContext().messages : []);

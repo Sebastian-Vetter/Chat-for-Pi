@@ -3,6 +3,7 @@ import { ArrowUp, Check, ChevronDown, Code2, Copy, Folder, LoaderCircle, Menu, M
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, type Chat, type Config, type Message, type Snapshot } from './api';
+import InstructionFiles from './Instructions';
 
 const starters = [
   { icon: Code2, title: 'Build something new', text: 'Help me plan and build a new application in this workspace.' },
@@ -110,6 +111,7 @@ export default function App() {
         <button className="chat-select" title={chat.cwd} onClick={() => { setActive(chat.id); setDraft(''); setError(''); if (window.innerWidth <= 760) setSidebar(false); }}><MessageSquare size={15} /><span>{chat.title}</span></button>
         <div className="chat-item-actions"><button className="icon-button" aria-label={`Rename ${chat.title}`} onClick={() => void rename(chat)}><MoreHorizontal size={14} /></button><button className="icon-button" aria-label={`Delete ${chat.title}`} onClick={() => void remove(chat)}><Trash2 size={13} /></button></div>
       </div>) : <div className="empty-history">{search ? 'No matching conversations.' : 'A little space for your next big idea. Start a conversation.'}</div>}</nav>
+      <InstructionFiles chatId={active} />
       <div className="sidebar-footer"><span className="local-dot" /><div><strong>Your local workspace</strong><small>Powered by Pi coding agent</small></div><span className="local-label">LOCAL</span></div>
     </aside></>}
     <main className="main-panel">

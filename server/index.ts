@@ -44,6 +44,7 @@ app.param('id', (req, res, next, id) => {
   if (!store.get(id)) { res.status(404).json({ error: 'Chat not found' }); return; } next();
 });
 app.get('/api/chats/:id', (req, res) => res.json(agents.snapshot(store.get(req.params.id)!)));
+app.get('/api/chats/:id/instructions', (req, res) => res.json(agents.instructions(store.get(req.params.id)!)));
 app.patch('/api/chats/:id', (req, res) => {
   const title = req.body?.title;
   if (typeof title !== 'string' || !title.trim() || title.length > 120) { res.status(400).json({ error: 'Title must be 1–120 characters' }); return; }
