@@ -100,6 +100,19 @@ The backend uses `@earendil-works/pi-coding-agent` directly, including your exis
 
 Terminal-only extensions, skills, prompt templates, themes, and MCP integrations are intentionally disabled in this first web host. Standard Pi tools and workspace context discovery are available. The app does not execute the Pi CLI as a subprocess.
 
+## Web commands and research subagents
+
+Click **Commands /** below the composer or type `/help` to see supported commands.
+
+- `/subagent` or `/subagent on` enables AI research delegation for this conversation. Then send a normal prompt such as “Use subagents to investigate the API and frontend independently, then summarize the risks.” Pi decides when to call the research tool; enabling it alone does not make a provider request.
+- `/subagent off` disables future delegation; `/subagent status` reports the setting. The setting survives reloads.
+- Children use the parent's current model and credentials, an independent context, and only `read`, `grep`, `find`, and `ls`. They cannot edit files, run a shell, or recursively delegate. The parent supplies the research question and receives the findings. Up to three children may run per conversation, each with a three-minute timeout. Provider calls can cost extra. Read-only tools are not a filesystem sandbox.
+- The **Research subagents** panel shows task/progress, status, duration, and final findings or errors. Only observable activity and output are shown, never private reasoning. Stop cancels the parent and its active children. Activity survives reloads; unfinished work is marked interrupted after a server restart.
+- `/compact [instructions]`, `/model [provider/model-id]`, and `/thinking off|minimal|low|medium|high|xhigh` control the SDK session. Model capabilities may clamp the thinking level.
+- `/stop`, `/new`, `/settings`, `/resume`, and `/diff` invoke their web equivalents. Session import creates an independent copy, not a mutation of terminal history.
+
+**This is not complete terminal command parity.** Interactive login/logout, package management, terminal extensions, themes, session trees, export, shell shortcuts, and other TUI-only commands still require Pi in a terminal. Unsupported slash commands are rejected, not sent to a model or executed as shell commands. Arbitrary terminal extensions remain disabled for compatibility and safety.
+
 ## Included
 
 - Persistent conversations with their own Pi session and working directory

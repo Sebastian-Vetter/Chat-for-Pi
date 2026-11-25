@@ -5,6 +5,7 @@ import type { ChatRecord, ChatStore } from './store.js';
 import { conversationInstructions } from './instructions.js';
 import { ActivityLog } from './activity.js';
 import { PromptQueues } from './queue.js';
+import { Subagents } from './subagents.js';
 
 export interface DisplayMessage { role: string; text: string; toolName?: string; isError?: boolean }
 export function displayMessages(messages: readonly unknown[], streamingMessage?: unknown): DisplayMessage[] {
@@ -28,7 +29,8 @@ export class AgentService {
   private summaries = new Map<string, string>();
   private closing = false;
   readonly queues: PromptQueues;
-  constructor(private store: ChatStore, readonly activity = new ActivityLog(join(store.directory, 'activity'))) { this.queues = new PromptQueues(join(store.directory, 'queues')); }
+  private subagents: Subagents;
+  constructor(private store: ChatStore, readonly activity = new ActivityLog(join(store.directory, 'activity'))) { this.queues = new PromptQueues(join(store.directory, 'queues')); this.subagents = new Subagents(this.runtime, activity, record => this.publish(record)); }
   summariesList() { return this.store.list().map(chat => ({ id: chat.id, title: chat.title, busy: this.busy(chat.id), error: this.errors.get(chat.id) })); }
   subscribeAll(fn: (summary: unknown) => void) { this.globalListeners.add(fn); return () => { this.globalListeners.delete(fn); }; }
   enqueue(record: ChatRecord, text: string, model?: string) {
@@ -74,7 +76,9 @@ export class AgentService {
     // TUI extensions require interactive UI bindings; do not execute them in this web host.
     const resourceLoader = new DefaultResourceLoader({ cwd: record.cwd, agentDir: getAgentDir(), noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true });
     await resourceLoader.reload();
-    const { session } = await createAgentSession({ cwd: record.cwd, sessionManager, resourceLoader, modelRuntime: await this.runtime });
+    const { session } = await createAgentSession({ cwd: record.cwd, sessionManager, resourceLoader, modelRuntime: await this.runtime,
+      customTools: [this.subagents.tool(record, () => this.sessions.get(record.id))] });
+    session.setActiveToolsByName(session.getActiveToolNames().filter(name => name !== 'subagent').concat(record.subagentsEnabled ? ['subagent'] : []));
     this.sessions.set(record.id, session);
     if (session.sessionFile) this.store.update(record.id, { sessionFile: session.sessionFile });
     session.subscribe(event => {
@@ -109,8 +113,9 @@ export class AgentService {
         await session.setModel(model);
       }
       if (record.title === 'New chat') this.store.update(record.id, { title: text.replace(/\s+/g, ' ').slice(0, 70) });
-      await session.prompt(text);
-      const last = session.messages.findLast(message => message.role === 'assistant');
+      if (text.startsWith('/')) await this.command(record, session, text);
+      else await session.prompt(text);
+      const last = text.startsWith('/') ? undefined : session.messages.findLast(message => message.role === 'assistant');
       this.activity.update(record.id, runId, { status: last?.role === 'assistant' && last.stopReason === 'aborted' ? 'stopped' : last?.role === 'assistant' && last.errorMessage ? 'failed' : 'passed' });
       if (last?.role === 'assistant' && (last.stopReason === 'aborted' || last.errorMessage)) this.queues.pause(record.id, true);
     } catch (error) {
@@ -122,6 +127,28 @@ export class AgentService {
       this.store.update(record.id, { contextUsage: session?.getContextUsage(), modelName: session?.model ? `${session.model.provider}/${session.model.id}` : record.modelName }); this.publish(record);
       queueMicrotask(() => this.drain(record));
     }
+  }
+  private async command(record: ChatRecord, session: AgentSession, text: string) {
+    const [command, ...parts] = text.split(/\s+/); const args = parts.join(' ');
+    let result: string;
+    if (command === '/subagent') {
+      if (args && !['on', 'off', 'status'].includes(args)) throw new Error('Usage: /subagent [on|off|status]. Enable, then describe your research task.');
+      if (args !== 'status') this.store.update(record.id, { subagentsEnabled: args !== 'off' });
+      session.setActiveToolsByName(session.getActiveToolNames().filter(name => name !== 'subagent').concat(record.subagentsEnabled ? ['subagent'] : []));
+      result = `Research subagents ${record.subagentsEnabled ? 'enabled' : 'disabled'}. ${record.subagentsEnabled ? 'Pi can now delegate focused research via the subagent tool. Children use the current model with read-only tools and additional provider usage.' : ''}`;
+    } else if (command === '/compact') {
+      await session.compact(args || undefined); result = 'Conversation compacted.';
+    } else if (command === '/model') {
+      const runtime = await this.runtime;
+      const models = await runtime.getAvailable();
+      if (args) { const model = models.find(m => `${m.provider}/${m.id}` === args); if (!model) throw new Error('Use /model provider/model-id from the model picker.'); await session.setModel(model); }
+      result = `Model: ${session.model ? `${session.model.provider}/${session.model.id}` : 'none'}`;
+    } else if (command === '/thinking') {
+      if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(args)) throw new Error('Usage: /thinking off|minimal|low|medium|high|xhigh');
+      session.setThinkingLevel(args as Parameters<AgentSession['setThinkingLevel']>[0]); result = `Thinking level: ${session.thinkingLevel}`;
+    } else throw new Error(`Unsupported web command: ${command}. Open Commands for supported commands and terminal alternatives.`);
+    const id = this.activity.start(record.id, 'agent', command, result);
+    this.activity.update(record.id, id, { status: 'passed' });
   }
   async abort(id: string) {
     this.queues.pause(id, true);

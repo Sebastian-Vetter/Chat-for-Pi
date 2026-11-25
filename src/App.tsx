@@ -9,6 +9,9 @@ import SettingsDialog, { readPreferences, playFinishSound, unlockSound } from '.
 import PiSessionBrowser from './PiSessions';
 import { ContextMeter, PromptQueue } from './SessionStatus';
 import ThinkingPanel from './ThinkingPanel';
+import Commands from './Commands';
+import Subagents from './Subagents';
+import './commands.css';
 import { version as appVersion } from '../package.json';
 
 const starters = [
@@ -42,6 +45,7 @@ export default function App() {
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
   const [piSessionsOpen, setPiSessionsOpen] = useState(false);
   const [preferences, setPreferences] = useState(readPreferences);
   const [soundNotice, setSoundNotice] = useState('');
@@ -117,7 +121,15 @@ export default function App() {
   function newChat() { selectChat(null); setDraft(''); setError(''); setLoading(false); if (window.innerWidth <= 760) setSidebar(false); textarea.current?.focus(); }
   async function send(event?: FormEvent) {
     event?.preventDefault();
-    if (!draft.trim() || submitting.current || !config || loading || (!!active && !connected)) return;
+    if (!draft.trim() || submitting.current) return;
+    const command = draft.trim();
+    const localCommands: Record<string, () => void> = {
+      '/help': () => setCommandsOpen(true), '/new': newChat, '/settings': () => setSettingsOpen(true),
+      '/resume': () => setPiSessionsOpen(true), '/diff': () => setInspectorOpen(true),
+      '/stop': () => { if (active) void api(`/chats/${active}/stop`, { method: 'POST', body: '{}' }).catch(e => setError(errorText(e))); },
+    };
+    if (localCommands[command]) { setDraft(''); localCommands[command](); return; }
+    if (!config || loading || (!!active && !connected)) return;
     submitting.current = true; setSending(true); setError(''); follow.current = true;
     const text = draft;
     try {
@@ -162,14 +174,17 @@ export default function App() {
       <PromptQueue snapshot={snapshot} onError={setError} />
       <div className="conversation-scroll" ref={scroll} onScroll={() => { const el = scroll.current; if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>
         {!messages.length && !loading && !busy ? <section className="welcome"><div className="welcome-label"><span />YOUR IDEAS. YOUR WORKSPACE.</div><div className="welcome-logo">π<span /></div><h1>What will we build<span>today?</span></h1><p>A conversation away from your next idea.<br />Write, explore, and build with Pi in your own workspace.</p><div className="starters">{starters.map(item => <button key={item.title} onClick={() => { setDraft(item.text); textarea.current?.focus(); }}><item.icon size={20} /><strong>{item.title}</strong><span>{item.text}</span><span className="starter-arrow">↗</span></button>)}</div><div className="welcome-note"><Folder size={13} />Working in <button onClick={() => setWorkspaceOpen(true)}>{(currentChat?.cwd ?? cwd).replace(/^\/Users\/[^/]+/, '~') || 'your workspace'}</button></div></section> : <section className="transcript" aria-label="Chat messages">{loading && <div className="status-line"><LoaderCircle size={16} className="spin" />Loading conversation…</div>}{messages.map((message, index) => <MessageView key={index} message={message} />)}<ThinkingPanel snapshot={snapshot} /></section>}
+        {snapshot?.events?.filter(event => event.label.startsWith('/') && event.status === 'passed').slice(-1).map(event => <div className="web-command-result" role="status" key={event.id}><strong>{event.label}</strong><p>{event.detail}</p></div>)}
+        <Subagents snapshot={snapshot} />
       </div>
       <div className="composer-area">{(error || snapshot?.error) && <div className="error-banner" role="alert">{error || snapshot?.error}<button className="icon-button" aria-label="Dismiss error" onClick={() => { setError(''); setSnapshot(s => s ? { ...s, error: undefined } : s); }}><X size={14} /></button></div>}{active && !connected && <div className="connection-notice" role="status">Connecting to your session… If the server stopped, restart it with npm run dev.</div>}
         {soundNotice && <div className="sound-notice" role="status"><span>{soundNotice}</span><button onClick={() => setSettingsOpen(true)}>Audio settings</button><button className="icon-button" aria-label="Dismiss audio notice" onClick={() => setSoundNotice('')}><X size={13} /></button></div>}
         <form className={`composer ${busy ? 'composer-working' : ''}`} aria-label="Message composer" aria-busy={busy} onSubmit={e => void send(e)}><span className="sr-only" role="status">{busy ? 'Pi is working.' : ''}</span><textarea ref={textarea} aria-label="Message Pi" placeholder={snapshot?.busy ? 'Write your next prompt — it will be queued…' : 'Ask Pi anything, or describe what you want to build…'} rows={2} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} /><div className="composer-toolbar"><div className="model-picker"><Sparkles size={14} /><select aria-label="Model" value={selectedModel} disabled={busy || !config} onChange={e => setModel(e.target.value)}><option value="">Pi default model</option>{config?.models.map(m => <option value={m.key} key={m.key}>{m.name} · {m.provider}</option>)}</select><ChevronDown size={12} /></div><div className="composer-right"><span className="enter-hint">{snapshot?.busy ? '↵ to queue' : '↵ to send'} · ⇧ ↵ newline</span>{busy && !!draft.trim() && <button type="submit" className="queue-send" aria-label="Queue prompt" disabled={sending || !connected}>Queue <Plus size={13} /></button>}{busy ? <button type="button" className="send-button stop-button" aria-label="Stop response" onClick={() => { if (active) void api(`/chats/${active}/stop`, { method: 'POST', body: '{}' }).catch(e => setError(errorText(e))); }}><Square size={16} fill="currentColor" /></button> : <button className="send-button" type="submit" aria-label="Send message" disabled={!draft.trim() || !config || loading || (!!active && !connected)}><ArrowUp size={20} /></button>}</div></div></form>
-        <div className="composer-bottom"><ContextMeter snapshot={snapshot} /><p className="composer-disclaimer">Pi can edit files and run commands. Review important changes.</p></div>
+        <div className="composer-bottom"><button type="button" className="commands-button" onClick={() => setCommandsOpen(true)}>Commands /</button><ContextMeter snapshot={snapshot} /><p className="composer-disclaimer">Pi can edit files and run commands. Review important changes.</p></div>
       </div>
     </main>
     {inspectorOpen && <Inspector chatId={active} events={snapshot?.events ?? []} close={() => setInspectorOpen(false)} />}
+    {commandsOpen && <Commands close={() => setCommandsOpen(false)} choose={command => { setDraft(command); setCommandsOpen(false); textarea.current?.focus(); }} />}
     {settingsOpen && <SettingsDialog value={preferences} version={appVersion} save={next => { setPreferences(next); setSoundNotice(''); }} close={() => setSettingsOpen(false)} />}
     {piSessionsOpen && <PiSessionBrowser close={() => setPiSessionsOpen(false)} imported={chat => { setChats(current => [chat, ...current]); selectChat(chat.id); setPiSessionsOpen(false); if (window.innerWidth <= 760) setSidebar(false); }} />}
     {workspaceOpen && <WorkspaceDialog value={currentChat?.cwd ?? cwd} locked={!!active} close={() => setWorkspaceOpen(false)} save={value => { setCwd(value); setWorkspaceOpen(false); }} />}

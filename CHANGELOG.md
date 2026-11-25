@@ -4,6 +4,14 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-25
+
+### Added
+
+- Opt-in `/subagent` research delegation using independent read-only Pi sessions, inherited model selection, bounded concurrency and runtime, parent cancellation, and persistent task/progress/result cards.
+- Discoverable web command menu with subagent activation, compaction, model and thinking controls, and web shortcuts for settings, session import, workspace tools, new chats, and stop. Unsupported terminal commands are explicitly rejected; TUI-only integrations remain disabled.
+- Offline regression coverage for delegation lifecycle, command activation, and browser command discovery. Browser tests now wait for API health before starting, avoiding frontend/API startup races.
+
 ## [1.0.1] - 2026-11-25
 
 ### Changed
