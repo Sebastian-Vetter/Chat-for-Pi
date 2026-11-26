@@ -9,14 +9,25 @@ import { changes, fileDiff } from './git.js';
 import { discoverTasks, PipelineService } from './pipelines.js';
 import { PiSessions } from './pi-sessions.js';
 import { UpdateChecker } from '../scripts/updates.ts';
+import { UsageLimitChecker, USAGE_PROVIDERS } from './usage-limits.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 const dataDir = resolve(process.env.CHAT_DATA_DIR ?? '.data');
 const store = new ChatStore(dataDir);
 const agents = new AgentService(store);
-const pipelines = new PipelineService(agents.activity, (record) => agents.publish(record));
+const pipelines = new PipelineService(
+  agents.activity,
+  (record) => agents.publish(record),
+  (record, task) =>
+    agents.approvals.guard(record, 'configured_test', {
+      command: task.command,
+      executable: task.executable,
+      args: task.args,
+    }),
+);
 const piSessions = new PiSessions(store);
+const usageLimits = new UsageLimitChecker(agents.runtime, process.env.CHAT_USAGE_CHECK !== '0');
 const appVersion: string = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ).version;
@@ -69,6 +80,7 @@ app.get('/api/config', async (_req, res) => {
     defaultCwd: resolve(process.env.CHAT_WORKSPACE ?? '..'),
     home: homedir(),
     models,
+    usageProviders: USAGE_PROVIDERS.filter((provider) => runtime.isUsingOAuth(provider)),
   });
 });
 app.get('/api/updates', async (_req, res) => {
@@ -78,6 +90,15 @@ app.get('/api/updates', async (_req, res) => {
 app.post('/api/updates/check', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(await updates.check(true));
+});
+app.post('/api/usage-limits/check', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const provider = USAGE_PROVIDERS.find((item) => item === req.body?.provider);
+  if (!provider) {
+    res.status(400).json({ error: 'Unsupported subscription provider' });
+    return;
+  }
+  res.json(await usageLimits.check(provider));
 });
 app.get('/api/chats', (_req, res) => res.json(store.list()));
 app.get('/api/pi-sessions', async (req, res) =>
@@ -171,10 +192,80 @@ app.post('/api/chats/:id/tests', async (req, res) => {
   }
 });
 app.post('/api/chats/:id/tests/stop', async (req, res) => {
+  agents.approvals.cancel(req.params.id);
   await pipelines.stop(req.params.id);
   res.json({ ok: true });
 });
+app.post('/api/chats/:id/approvals/:approvalId', (req, res) => {
+  if (typeof req.body?.approved !== 'boolean') {
+    res.status(400).json({ error: 'approved must be a boolean' });
+    return;
+  }
+  if (!agents.approvals.decide(req.params.id, req.params.approvalId, req.body.approved)) {
+    res.status(404).json({ error: 'Approval no longer pending in this conversation' });
+    return;
+  }
+  res.json({ ok: true });
+});
 app.patch('/api/chats/:id', (req, res) => {
+  const body = req.body ?? {};
+  const field = ['pinned', 'folder', 'approvalMode', 'plan'].find((key) =>
+    Object.hasOwn(body, key),
+  );
+  if (field) {
+    if (Object.keys(body).length !== 1) {
+      res.status(400).json({ error: 'Send one metadata field at a time' });
+      return;
+    }
+    if (field === 'folder') {
+      if (typeof body.folder !== 'string' || body.folder.length > 80) {
+        res.status(400).json({ error: 'Folder must contain at most 80 characters' });
+        return;
+      }
+    } else if (field === 'plan') {
+      if (
+        !Array.isArray(body.plan) ||
+        body.plan.length > 30 ||
+        !body.plan.every(
+          (step: { text?: unknown; status?: unknown } | null) =>
+            step &&
+            typeof step.text === 'string' &&
+            !!step.text.trim() &&
+            step.text.length <= 300 &&
+            typeof step.status === 'string' &&
+            ['pending', 'running', 'done'].includes(step.status),
+        )
+      ) {
+        res.status(400).json({ error: 'Invalid task plan' });
+        return;
+      }
+    } else if (typeof body[field] !== 'boolean') {
+      res.status(400).json({ error: `${field} must be a boolean` });
+      return;
+    }
+    if (
+      (field === 'approvalMode' || field === 'plan') &&
+      (agents.busy(req.params.id) || pipelines.busy(req.params.id))
+    ) {
+      res
+        .status(409)
+        .json({ error: 'Stop active work before changing the approval mode or editing the plan' });
+      return;
+    }
+    const value =
+      field === 'folder'
+        ? body.folder.trim()
+        : field === 'plan'
+          ? body.plan.map((step: { text: string; status: string }) => ({
+              text: step.text.trim(),
+              status: step.status,
+            }))
+          : body[field];
+    const record = store.update(req.params.id, { [field]: value });
+    agents.publish(record);
+    res.json(record);
+    return;
+  }
   if (Object.hasOwn(req.body ?? {}, 'archived')) {
     if (typeof req.body.archived !== 'boolean' || Object.keys(req.body).length !== 1) {
       res.status(400).json({ error: 'archived must be a boolean and sent on its own' });

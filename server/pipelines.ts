@@ -75,10 +75,12 @@ interface Running {
 export class PipelineService {
   private running = new Map<string, Running>();
   private launching = new Set<string>();
+  private cancelled = new Set<string>();
   private closing = false;
   constructor(
     private log: ActivityLog,
     private notify: (record: ChatRecord) => void,
+    private authorize?: (record: ChatRecord, task: LocalTask) => Promise<void>,
   ) {}
   busy(chatId: string) {
     return this.running.has(chatId) || this.launching.has(chatId);
@@ -88,6 +90,7 @@ export class PipelineService {
     if (this.busy(record.id))
       throw new Error('A local test run is already active in this conversation.');
     this.launching.add(record.id);
+    this.cancelled.delete(record.id);
     try {
       const cwd = await realpath(record.cwd);
       const task = (await discoverTasks(cwd)).find((task) => task.id === taskId);
@@ -95,7 +98,11 @@ export class PipelineService {
         throw new Error('This test command is not configured in the workspace. Refresh Tests.');
       if ([...this.running.values()].some((run) => run.cwd === cwd))
         throw new Error('A local test run is already active in this workspace.');
-      if (this.closing) throw new Error('The server is shutting down.');
+      if (this.closing || this.cancelled.has(record.id)) throw new Error('Test run cancelled.');
+      await this.authorize?.(record, task);
+      if (this.closing || this.cancelled.has(record.id)) throw new Error('Test run cancelled.');
+      if ([...this.running.values()].some((run) => run.cwd === cwd))
+        throw new Error('A local test run is already active in this workspace.');
       const eventId = this.log.start(record.id, 'test', task.name, `$ ${task.command}\n`);
       let output = `$ ${task.command}\n`,
         finished = false,
@@ -149,9 +156,11 @@ export class PipelineService {
       return eventId;
     } finally {
       this.launching.delete(record.id);
+      this.cancelled.delete(record.id);
     }
   }
   async stop(chatId: string) {
+    if (this.launching.has(chatId)) this.cancelled.add(chatId);
     const active = this.running.get(chatId);
     if (!active) return;
     active.child.emit('chat-stop');

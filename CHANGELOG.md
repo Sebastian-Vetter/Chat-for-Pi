@@ -4,6 +4,23 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-26
+
+### Added
+
+- A jump-to-latest button with a new-reply hint while reading older messages; clicking it resumes automatic following without interrupting manual scrolling.
+- Persistent pinned conversations, custom folders, and browser-persisted grouping by recency, workspace project, or folder. Sidebar actions no longer cover conversation titles.
+- Public pending/running/done task checklists, editable while idle and readable/updatable by Pi through an explicit `update_plan` tool. No private reasoning channels are used.
+- Markdown downloads for complete visible conversations or selected assistant responses, with safely fenced tool output and no hidden-thinking export.
+- Editable browser-local prompt templates, built-in review/debug/test shortcuts, and a searchable keyboard-accessible command palette for chats, projects, models, templates, and actions. Cmd/Ctrl K opens the palette; Cmd/Ctrl Shift N starts a new chat.
+- Opt-in per-conversation execution approvals that gate the actual write/edit/bash/PowerShell implementations and configured-test process spawning. Full proposals require a one-shot, chat-scoped decision; cancellation, expiry, shutdown, audit failures, and replayed decisions fail closed. Denied agent actions pause the prompt queue. This remains trusted local execution, not a sandbox or rollback system.
+- Explicit subscription-usage checks for OpenAI Codex/ChatGPT and Anthropic/Claude OAuth accounts: provider-reported 5-hour/weekly percentages and reset times, with honest unavailable/unsupported states. Checks use fixed endpoints, server-only credentials, bounded responses, deadlines, coalescing, a one-minute cache, and a `CHAT_USAGE_CHECK=0` opt-out. No inference prompts are sent.
+
+### Tests
+
+- Added approval tests covering real SDK overrides, writes/edits, denied shells, configured tests, cancellation, timeouts, audit failures, cross-chat decisions, replay protection, and persistent plans. Added quota metadata/parser/privacy tests and Markdown/template regression tests.
+- Added desktop/mobile workflow, download, quota, command-palette, and jump-button coverage without live-provider calls. Browser tests disable real usage checks and use unique chat fixtures.
+
 ## [1.0.7] - 2026-11-26
 
 ### Fixed

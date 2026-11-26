@@ -225,7 +225,12 @@ Click **Commands /** below the composer or type `/help` to see supported command
 - Browser-local finish sounds: original EV-inspired tones or custom audio (up to 1 MB)
 - Accessible animations and Reduce Motion support
 - Small version label at the bottom-left, Settings, and Mac shortcut reference
-- Enter to send/queue, ⇧↵ for a newline, ⌘K for a new chat, ⌘, for Settings, ⌘⇧E for workspace tools (Ctrl equivalents on other platforms)
+- Jump to the latest reply with an unread hint while reading older messages
+- Persistent pinned chats, custom folders, and project/folder grouping
+- Visible task checklists, Markdown exports, browser-local prompt templates, and a searchable command palette
+- Opt-in per-conversation execution approvals for file changes, shell commands, and configured tests
+- Provider-reported 5-hour and weekly subscription limits for supported OAuth accounts
+- Enter to send/queue, ⇧↵ for a newline, ⌘K for the command palette, ⌘⇧N for a new chat, ⌘, for Settings, ⌘⇧E for workspace tools (Ctrl equivalents on other platforms)
 
 Choose a workspace using the folder button **before sending a new conversation**. Existing conversations retain their original directory. The default is this project's parent directory (`coding`). A workspace path is validated when the conversation is created.
 
@@ -236,6 +241,36 @@ Use **Browse existing Pi sessions** in the left sidebar to search saved CLI sess
 Start a new conversation while another runs to work in parallel; sidebar spinners and the running-session count show background activity. Each conversation has a separate Pi session and prompt queue. They share your filesystem permissions, so choose separate workspaces or Git worktrees when concurrent edits could conflict.
 
 While Pi works, enter more prompts and press **Queue** or Enter. Pending prompts run sequentially in that conversation. Remove individual items or pause/resume the queue. **Stop** pauses the queue as well as aborting the current response. Provider failures also pause it. After a backend restart, saved pending/in-flight prompts are recovered **paused** for review; retrying interrupted work may repeat changes already made before the interruption.
+
+## Navigation, plans, templates, and export
+
+Scrolling upward pauses automatic following and reveals **Jump to latest** above the composer. A **New reply** hint appears when assistant text arrives while paused. Click the button or scroll back to the bottom to resume following. Opening another chat always starts at the latest content.
+
+Use a conversation's **Pin** action to keep it above recent chats. **Move to folder** assigns a custom folder name; an empty name removes it. **Group sessions** switches between Recent, By project (working-directory path), and By folder. Pins and folders are stored with the chat; grouping preferences stay in this browser. Archived chats retain their organization.
+
+**Task plan** shows explicit pending/running/done steps, not private model reasoning. Expand it to add steps or cycle their status while the chat is idle. Pi has an `update_plan` tool to read and publish this public checklist during multi-step work. Unfinished steps are not automatically marked done when a run stops.
+
+**Export chat** downloads the visible conversation as Markdown, including fenced tool output. Use the **Export** checkboxes below assistant answers and **Export selected** to download only those answers. No hidden thinking or credentials are added to exports; visible messages and tool output can themselves contain sensitive information.
+
+**Templates** manages browser-local prompt templates, initially `/review` (Code Review), `/debug` (Fehler analysieren), and `/tests` (Tests ergänzen). Choose a template to fill the composer without sending. Typing its shortcut followed by optional task context expands it when sent or queued. Custom shortcuts cannot replace built-in commands. Clearing browser storage removes custom templates.
+
+Press **⌘/Ctrl K** or click **Search** for the command palette. Search chats (including archived chats), projects from conversation workspaces, available models, templates, and actions. Use arrow keys and Enter to choose; Escape closes it. Choosing a model selects it for the next submitted prompt, not an already-running response. New chat is now **⌘/Ctrl Shift N**.
+
+## Action approvals
+
+Enable **Require approvals** in an idle conversation to require a proposal before each `write`, `edit`, `bash`, `powershell`, or configured test command. The backend waits before invoking the underlying file/shell tool or spawning a test process. Read-only tools and research children remain available; arbitrary CLI extensions, MCP, and codemode are not enabled in this web host.
+
+The approval panel shows the workspace and complete action arguments: replacement content/edits for file changes, or the exact shell/test invocation. **Approve once** authorizes only that pending action; **Reject**, Stop, expiry (10 minutes), and server shutdown fail closed. Requests cannot be approved from another chat or replayed. Pending approvals are not restored after a restart. Denied agent actions return a terminating error result and pause the prompt queue; already-approved concurrent actions are not rolled back. Decisions are recorded in Activity with a bounded argument preview. Approval mode cannot be changed during an active agent/test run.
+
+This is **not a sandbox or a transaction**. Approved shell commands and test scripts can execute arbitrary trusted local code, including lifecycle hooks, and access files beyond the workspace. Other local processes can change files/configuration while you review a proposal. Read-only tools can still read sensitive files. With the mode disabled (the default, preserving existing behavior), Pi can change files and run commands without these additional approvals. Do not expose this single-user app to other users or the network.
+
+## Subscription usage limits
+
+Click **Usage limits**, or find it in the command palette, to view your account-wide **5-hour** and **weekly** allowance: provider-reported percentage remaining/used and reset time. Usage outside the current chat is included. This is separate from the context-window token estimate and from API billing.
+
+OpenAI Codex/ChatGPT and Anthropic/Claude OAuth subscriptions are supported when the provider exposes its usage endpoint. Sign in to the matching provider through Pi first. API-key accounts and other providers may not have these windows. Missing windows, expired logins, unsupported response formats, offline errors, and provider rejections are shown explicitly; the app never fabricates allowance values. Provider usage endpoints may change or become unavailable; the dialog includes a link to the provider's usage page.
+
+Checks happen only when opening the dialog or clicking Refresh, not automatically on app startup. They send an authenticated metadata GET to the fixed provider endpoint, **not a model prompt**, and do not consume model tokens. OAuth resolution/refresh uses Pi's existing server-side credential handling; tokens and raw provider/account payloads never reach the browser or app logs. Requests reject redirects, have a five-second network/auth deadline, limit response size to 256 KiB, coalesce concurrent checks, and cache results for one minute. Set `CHAT_USAGE_CHECK=0` to disable checks. Managed services preserve this opt-out when explicitly started/restarted; active services are never restarted automatically.
 
 ## Workspace tools
 
@@ -257,7 +292,7 @@ App-managed chat metadata, Pi JSONL sessions, activity, and prompt queues are sa
 
 Deleting a chat removes its app-managed session history, not the files the agent created or changed in its workspace. Files are not automatically reverted when you delete a conversation or stop a response.
 
-**This is a trusted, single-user local application, not a sandbox.** Pi can run shell commands and edit files with your user permissions, including outside the working directory. Requests are not gated by an additional per-tool approval dialog. Review changes and do not expose this app through a tunnel, public reverse proxy, or network interface. Loopback binding, host/origin validation, JSON-only mutations, and no cross-origin API access help protect the local service; they are not multi-user authentication.
+**This is a trusted, single-user local application, not a sandbox.** Pi can run shell commands and edit files with your user permissions, including outside the working directory. Additional per-action approval is available through the opt-in **Require approvals** mode described above; it is disabled by default and does not provide filesystem or process isolation. Review changes and do not expose this app through a tunnel, public reverse proxy, or network interface. Loopback binding, host/origin validation, JSON-only mutations, and no cross-origin API access help protect the local service; they are not multi-user authentication.
 
 Keep only one backend process per data directory. Transcripts and tool output can contain sensitive information. This version does not support file attachments, interactive session-tree navigation, hosted CI integrations, or multi-user access. Test commands and package scripts are executable code: run them only in trusted workspaces.
 
@@ -294,6 +329,8 @@ PI_CHAT_LIVE=1 npm run test:e2e
 | `CHAT_WORKSPACE` | `..` | Initial working directory for new conversations |
 | `PORT` | `3001` | Backend/production HTTP port |
 | `CHROME_PATH` | unset | Optional browser executable for tests |
+| `CHAT_UPDATE_CHECK` | enabled | Set `0` to disable public release checks |
+| `CHAT_USAGE_CHECK` | enabled on explicit request | Set `0` to disable subscription-usage metadata checks |
 
 Paths are resolved relative to the directory where the server starts. `CHAT_API_PORT` selects Vite's proxy target (default 3001), and `CHAT_WEB_PORT` selects its web port and the API's allowed development origin (default 5173). Browser tests use ports 5174/13002 and `.data/e2e/`, separately from your running app. The managed service uses fixed port 3001, this checkout's `.data/`, and this checkout's parent workspace.
 

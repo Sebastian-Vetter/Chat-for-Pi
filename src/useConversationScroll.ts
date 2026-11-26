@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const BOTTOM_THRESHOLD_PX = 48;
 const SCROLL_TOLERANCE_PX = 1;
@@ -26,17 +26,29 @@ function isNearBottom(position: ScrollPosition) {
 }
 
 /** Follow new content until the reader deliberately scrolls upward. */
-export function useConversationScroll(conversationId: string | null) {
+export function useConversationScroll(conversationId: string | null, responseVersion?: string) {
+  const [paused, setPaused] = useState(false);
+  const [hasNewReply, setHasNewReply] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const lastPosition = useRef<ScrollPosition | undefined>(undefined);
   const scheduleScroll = useRef<() => void>(() => {});
 
-  const scrollToLatest = useCallback(() => {
-    following.current = true;
-    scheduleScroll.current();
+  const setFollowing = useCallback((value: boolean) => {
+    following.current = value;
+    setPaused(!value);
+    if (value) setHasNewReply(false);
   }, []);
+
+  const scrollToLatest = useCallback(() => {
+    setFollowing(true);
+    scheduleScroll.current();
+  }, [setFollowing]);
+
+  useEffect(() => {
+    if (responseVersion && !following.current) setHasNewReply(true);
+  }, [responseVersion]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -62,7 +74,7 @@ export function useConversationScroll(conversationId: string | null) {
 
     function pauseFollowing() {
       // Scrolling upward in a conversation that fits on screen cannot reveal older content.
-      if (viewport && viewport.scrollHeight > viewport.clientHeight) following.current = false;
+      if (viewport && viewport.scrollHeight > viewport.clientHeight) setFollowing(false);
     }
 
     function onScroll() {
@@ -74,7 +86,7 @@ export function useConversationScroll(conversationId: string | null) {
 
       const movedDown = current.top > previous.top + SCROLL_TOLERANCE_PX;
       if (movedDown && isNearBottom(current)) {
-        following.current = true;
+        setFollowing(true);
         schedule();
         return;
       }
@@ -89,7 +101,7 @@ export function useConversationScroll(conversationId: string | null) {
       }
 
       if (current.top < previous.top - SCROLL_TOLERANCE_PX) {
-        following.current = false;
+        setFollowing(false);
       }
     }
 
@@ -144,12 +156,12 @@ export function useConversationScroll(conversationId: string | null) {
       viewport.removeEventListener('touchmove', onTouchMove);
       viewport.removeEventListener('keydown', onKeyDown);
     };
-  }, []);
+  }, [setFollowing]);
 
   useLayoutEffect(() => {
     // A new/reopened conversation always starts at the latest content, even if the
     // previous conversation was paused while reading older messages.
-    following.current = true;
+    setFollowing(true);
     lastPosition.current = undefined;
     const viewport = viewportRef.current;
     if (viewport) {
@@ -157,7 +169,7 @@ export function useConversationScroll(conversationId: string | null) {
       lastPosition.current = readPosition(viewport);
     }
     scheduleScroll.current();
-  }, [conversationId]);
+  }, [conversationId, setFollowing]);
 
-  return { viewportRef, contentRef, scrollToLatest };
+  return { viewportRef, contentRef, scrollToLatest, paused, hasNewReply };
 }

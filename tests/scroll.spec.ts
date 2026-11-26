@@ -153,6 +153,9 @@ for (const { width, reducedMotion } of [
         .toBeLessThan(beforeReading - 100);
       await waitForScrollToStop(viewport);
       const readingTop = (await position(viewport)).top;
+      await expect(
+        page.getByRole('button', { name: 'Jump to latest ↓', exact: true }),
+      ).toBeVisible();
 
       snapshot.messages.push(...messages(5, 'Arriving while reading older messages'));
       await publish(page, snapshot);
@@ -164,11 +167,20 @@ for (const { width, reducedMotion } of [
       await settleLayout(page);
       expect(Math.abs((await position(viewport)).top - readingTop)).toBeLessThanOrEqual(2);
 
-      // Scrollbar/End-style movement back to the bottom resumes following.
-      await viewport.evaluate((element) => {
-        element.scrollTop = element.scrollHeight;
-      });
+      await expect(
+        page.getByRole('button', { name: 'New reply · Jump to latest ↓', exact: true }),
+      ).toBeVisible();
+      // Both the jump button and scrollbar/End-style movement resume following.
+      if (width === 1280)
+        await page
+          .getByRole('button', { name: 'New reply · Jump to latest ↓', exact: true })
+          .click();
+      else
+        await viewport.evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+        });
       await expectBottom(viewport);
+      await expect(page.getByRole('button', { name: /Jump to latest/ })).toHaveCount(0);
       await settleLayout(page);
       snapshot.messages.push(...messages(3, 'Following resumed'));
       await publish(page, snapshot);

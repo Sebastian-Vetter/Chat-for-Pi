@@ -215,8 +215,12 @@ export default function SettingsDialog({
       <h3 className="settings-shortcuts-heading">{mac ? 'Mac shortcuts' : 'Keyboard shortcuts'}</h3>
       <dl className="shortcut-list">
         <div>
-          <dt>New chat</dt>
+          <dt>Command palette</dt>
           <dd>{mac ? '⌘ K' : 'Ctrl K'}</dd>
+        </div>
+        <div>
+          <dt>New chat</dt>
+          <dd>{mac ? '⌘ ⇧ N' : 'Ctrl Shift N'}</dd>
         </div>
         <div>
           <dt>Settings</dt>

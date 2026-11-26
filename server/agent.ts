@@ -13,6 +13,8 @@ import { conversationInstructions } from './instructions.js';
 import { ActivityLog } from './activity.js';
 import { PromptQueues } from './queue.js';
 import { Subagents } from './subagents.js';
+import { Approvals } from './approvals.js';
+import { approvedTools, planTool } from './work-tools.js';
 
 export interface DisplayMessage {
   role: string;
@@ -65,11 +67,31 @@ export class AgentService {
   private closing = false;
   readonly queues: PromptQueues;
   private subagents: Subagents;
+  readonly approvals: Approvals;
   constructor(
     private store: ChatStore,
     readonly activity = new ActivityLog(join(store.directory, 'activity')),
   ) {
     this.queues = new PromptQueues(join(store.directory, 'queues'));
+    this.approvals = new Approvals(
+      (record) => this.publish(record),
+      (record, request, approved) => {
+        const id = this.activity.start(
+          record.id,
+          'agent',
+          `Approval · ${request.tool}`,
+          `${approved ? 'Approved once' : 'Rejected / expired / cancelled'}\n${JSON.stringify(request.input, null, 2).slice(0, 10000)}`,
+        );
+        this.activity.update(record.id, id, { status: approved ? 'passed' : 'stopped' });
+        if (!approved && request.tool !== 'configured_test') {
+          this.queues.pause(record.id, true);
+          this.errors.set(
+            record.id,
+            'An action was rejected, cancelled, or expired. Review the proposal before continuing.',
+          );
+        }
+      },
+    );
     this.subagents = new Subagents(this.runtime, activity, (record) => this.publish(record));
   }
   summariesList() {
@@ -129,6 +151,7 @@ export class AgentService {
       chat: record,
       contextUsage: session?.getContextUsage() ?? record.contextUsage,
       contextStale: !session,
+      approvals: this.approvals.list(record.id),
       queue: this.queues.state(record.id).items,
       queuePaused: this.queues.state(record.id).paused,
       events: this.activity.list(record.id),
@@ -198,7 +221,12 @@ export class AgentService {
       sessionManager,
       resourceLoader,
       modelRuntime: await this.runtime,
-      customTools: [this.subagents.tool(record, () => this.sessions.get(record.id))],
+      tools: ['read', 'grep', 'find', 'ls', 'bash', 'powershell', 'edit', 'write', 'update_plan'],
+      customTools: [
+        ...approvedTools(record, this.approvals),
+        planTool(record, this.store, () => this.publish(record)),
+        this.subagents.tool(record, () => this.sessions.get(record.id)),
+      ],
     });
     session.setActiveToolsByName(
       session
@@ -274,8 +302,9 @@ export class AgentService {
         ? undefined
         : session.messages.findLast((message) => message.role === 'assistant');
       this.activity.update(record.id, runId, {
-        status:
-          last?.role === 'assistant' && last.stopReason === 'aborted'
+        status: this.errors.has(record.id)
+          ? 'stopped'
+          : last?.role === 'assistant' && last.stopReason === 'aborted'
             ? 'stopped'
             : last?.role === 'assistant' && last.errorMessage
               ? 'failed'
@@ -343,6 +372,7 @@ export class AgentService {
     this.activity.update(record.id, id, { status: 'passed' });
   }
   async abort(id: string) {
+    this.approvals.cancel(id);
     this.queues.pause(id, true);
     const pending = this.loading.get(id);
     if (pending) await pending;
@@ -351,12 +381,14 @@ export class AgentService {
     if (record) this.publish(record);
   }
   dispose(id: string) {
+    this.approvals.cancel(id);
     this.sessions.get(id)?.dispose();
     this.sessions.delete(id);
     this.errors.delete(id);
   }
   async shutdown() {
     this.closing = true;
+    this.approvals.shutdown();
     await Promise.allSettled([...this.loading.values()]);
     await Promise.allSettled([...this.sessions.values()].map((s) => s.abort()));
     for (const session of this.sessions.values()) session.dispose();

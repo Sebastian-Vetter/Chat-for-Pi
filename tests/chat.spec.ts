@@ -22,13 +22,14 @@ test('desktop: welcome, starter, workspace dialog, and saved chat management', a
   await expect(page.getByRole('dialog')).not.toBeVisible();
   const response = await request.post('/api/chats', { data: { cwd: process.cwd() } });
   const chat = await response.json();
+  const title = `Browser test conversation ${chat.id}`;
   try {
-    await request.patch(`/api/chats/${chat.id}`, { data: { title: 'Browser test conversation' } });
+    await request.patch(`/api/chats/${chat.id}`, { data: { title } });
     await page.reload();
-    await page.getByRole('button', { name: 'Browser test conversation', exact: true }).click();
-    await expect(page.locator('.page-title')).toHaveText('Browser test conversation');
+    await page.getByRole('button', { name: title, exact: true }).click();
+    await expect(page.locator('.page-title')).toHaveText(title);
     await page.reload();
-    await expect(page.locator('.page-title')).toHaveText('Browser test conversation');
+    await expect(page.locator('.page-title')).toHaveText(title);
     await page.getByLabel('Search chats').fill('no-matching-chat-1234');
     await expect(page.getByText('No matching conversations.')).toBeVisible();
     await page.getByLabel('Search chats').fill('');

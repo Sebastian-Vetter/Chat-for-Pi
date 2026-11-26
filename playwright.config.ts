@@ -16,6 +16,7 @@ export default defineConfig({
     timeout: 60000,
     env: {
       CHAT_UPDATE_CHECK: '0',
+      CHAT_USAGE_CHECK: '0',
       PORT: '13002',
       CHAT_API_PORT: '13002',
       CHAT_WEB_PORT: '5174',

@@ -10,7 +10,13 @@ test('local API validates requests and persists a chat lifecycle', { timeout: 45
   const dataDir = mkdtempSync(join(tmpdir(), 'pi-chat-api-'));
   const port = 13001;
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
-    env: { ...process.env, CHAT_UPDATE_CHECK: '0', PORT: String(port), CHAT_DATA_DIR: dataDir },
+    env: {
+      ...process.env,
+      CHAT_UPDATE_CHECK: '0',
+      CHAT_USAGE_CHECK: '0',
+      PORT: String(port),
+      CHAT_DATA_DIR: dataDir,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
@@ -47,6 +53,26 @@ test('local API validates requests and persists a chat lifecycle', { timeout: 45
     }
     assert.ok(ready, logs);
     assert.equal((await (await request('/updates')).json()).status, 'disabled');
+    assert.equal(
+      (await (await request('/usage-limits/check', 'POST', { provider: 'openai-codex' })).json())
+        .status,
+      'disabled',
+    );
+    assert.equal(
+      (await request('/usage-limits/check', 'POST', { provider: 'https://evil.example' })).status,
+      400,
+    );
+    assert.equal(
+      (
+        await request(
+          '/usage-limits/check',
+          'POST',
+          { provider: 'anthropic' },
+          { Origin: 'https://evil.example' },
+        )
+      ).status,
+      403,
+    );
     assert.equal((await (await request('/updates/check', 'POST', {})).json()).status, 'disabled');
     assert.equal(
       (await request('/updates/check', 'POST', {}, { Origin: 'https://evil.example' })).status,
@@ -84,6 +110,38 @@ test('local API validates requests and persists a chat lifecycle', { timeout: 45
     assert.deepEqual((await (await request(`/chats/${chat.id}`)).json()).messages, []);
     assert.equal((await request(`/chats/${chat.id}`, 'PATCH', { archived: false })).status, 200);
     assert.equal((await (await request('/chats')).json())[0].archived, false);
+    for (const values of [
+      { pinned: 'yes' },
+      { folder: 'x'.repeat(81) },
+      { approvalMode: 1 },
+      { pinned: true, approvalMode: false },
+      { plan: [{ text: 'Step', status: ['pending'] }] },
+      { plan: [{ text: ' ', status: 'pending' }] },
+    ]) {
+      assert.equal((await request(`/chats/${chat.id}`, 'PATCH', values)).status, 400);
+    }
+    for (const values of [
+      { pinned: true },
+      { folder: ' Project A ' },
+      { approvalMode: true },
+      { plan: [{ text: 'Run tests', status: 'pending' }] },
+    ]) {
+      assert.equal((await request(`/chats/${chat.id}`, 'PATCH', values)).status, 200);
+    }
+    const organized = await (await request(`/chats/${chat.id}`)).json();
+    assert.equal(organized.chat.pinned, true);
+    assert.equal(organized.chat.folder, 'Project A');
+    assert.equal(organized.chat.approvalMode, true);
+    assert.deepEqual(organized.chat.plan, [{ text: 'Run tests', status: 'pending' }]);
+    assert.equal(
+      (await request(`/chats/${chat.id}/approvals/nonexistent`, 'POST', { approved: true })).status,
+      404,
+    );
+    assert.equal(
+      (await request(`/chats/${chat.id}/approvals/nonexistent`, 'POST', { approved: 'yes' }))
+        .status,
+      400,
+    );
     assert.equal((await request(`/chats/${chat.id}`, 'DELETE', {})).status, 200);
     assert.equal((await request(`/chats/${chat.id}`)).status, 404);
     assert.deepEqual(await (await request('/chats')).json(), []);

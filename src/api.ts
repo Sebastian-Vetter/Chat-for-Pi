@@ -1,5 +1,9 @@
 export interface Chat {
   archived?: boolean;
+  pinned?: boolean;
+  folder?: string;
+  approvalMode?: boolean;
+  plan?: { text: string; status: 'pending' | 'running' | 'done' }[];
   subagentsEnabled?: boolean;
   id: string;
   title: string;
@@ -30,6 +34,7 @@ export interface QueuedPrompt {
 }
 export interface Snapshot {
   chat: Chat;
+  approvals?: { id: string; tool: string; input: unknown; cwd: string; createdAt: string }[];
   queue?: QueuedPrompt[];
   queuePaused?: boolean;
   contextUsage?: { tokens: number | null; contextWindow: number; percent: number | null };
@@ -44,6 +49,7 @@ export interface Snapshot {
 export interface Config {
   version: string;
   defaultCwd: string;
+  usageProviders?: string[];
   models: { key: string; name: string; provider: string }[];
 }
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
