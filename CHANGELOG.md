@@ -4,6 +4,17 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-11-26
+
+### Added
+
+- Shared chats show a quiet, accessible “Name is typing…” indicator directly above the input. Owners and writers announce typing; readers can observe it. Multiple participants are summarized and your own name is hidden.
+- Typing metadata contains no draft text and is never persisted or sent to a model. Per-tab leases renew while typing, stop on idle/blur/send/navigation, expire after six seconds on disconnect, and are cleared on role changes or sharing off. Backend permissions prevent reader announcements and names come from authenticated installation identities.
+
+### Tests
+
+- Added lease-expiry, renewal, multiple-tab isolation, validation, revocation, reader-denial and real TLS presence tests. Desktop/mobile owner/writer/reader regressions verify positioning, names, self-filtering, idle/blur cleanup, draft preservation and metadata-only requests.
+
 ## [1.2.3] - 2026-11-26
 
 ### Fixed

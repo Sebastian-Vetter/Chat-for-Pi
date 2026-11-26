@@ -309,6 +309,16 @@
   max-height: 96px;
   overflow: auto;
 }
+.shared-typing {
+  min-height: 20px;
+  margin: 0 4px 5px;
+  color: #8e9d87;
+  font-size: 11px;
+  line-height: 20px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .shared-composer-hint {
   color: #78886f;
   font-size: 10px;

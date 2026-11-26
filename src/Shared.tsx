@@ -4,6 +4,7 @@ import { api, type Chat, type Message } from './api';
 import SharedFiles, { sharedRequest } from './SharedFiles';
 import MessageView from './MessageView';
 import { useConversationScroll } from './useConversationScroll';
+import { TypingIndicator, useSharedTyping, type TypingPerson } from './SharedTyping';
 
 export interface Identity {
   id: string;
@@ -616,6 +617,7 @@ export function SharedSidebar({
 }
 interface RemoteSnapshot {
   historyLimited?: boolean;
+  typing?: TypingPerson[];
   id: string;
   title: string;
   owner: Identity;
@@ -633,15 +635,18 @@ export function RemoteSharedView({
   roleChanged,
   networkControl,
   sidebarControl,
+  identityId,
 }: {
   id: string;
   changed: () => void;
   roleChanged: (role: 'reader' | 'writer' | undefined) => void;
   networkControl: React.ReactNode;
   sidebarControl?: React.ReactNode;
+  identityId: string;
 }) {
   const [snapshot, setSnapshot] = useState<RemoteSnapshot>();
   const [draft, setDraft] = useState('');
+  const typing = useSharedTyping(id, true, snapshot?.role === 'writer');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -694,6 +699,7 @@ export function RemoteSharedView({
       );
       return;
     }
+    typing.stop();
     const submitted = draft;
     setSending(true);
     try {
@@ -770,6 +776,7 @@ export function RemoteSharedView({
         </div>
       )}
       <div className="composer-area shared-remote-footer">
+        <TypingIndicator people={snapshot?.typing ?? []} self={identityId} />
         {error && (
           <p className="shared-error" role="alert" tabIndex={0}>
             {error}
@@ -794,7 +801,11 @@ export function RemoteSharedView({
               rows={2}
               aria-label="Message shared session"
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                typing.changed(event.target.value);
+              }}
+              onBlur={typing.stop}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();

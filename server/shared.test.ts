@@ -95,6 +95,29 @@ test('reader/writer authorization, proof binding, queue attribution, role revoca
       /Read-only/,
     );
     assert.throws(() => rpc(writer, readerToken, 'snapshot'), /revoked/);
+    const typingClient = '00000000-0000-4000-8000-000000000001';
+    assert.throws(
+      () => rpc(reader, readerToken, 'typing', { client: typingClient, active: true }),
+      /Read-only/,
+    );
+    rpc(writer, writerToken, 'typing', {
+      client: typingClient,
+      active: true,
+      name: 'Forged owner',
+      text: 'DO_NOT_STORE_DRAFT',
+    });
+    owner.shared.ownerTyping(chat.id, typingClient, true);
+    assert.deepEqual(
+      owner.shared
+        .typingPeople(chat.id)
+        .map((person) => person.name)
+        .sort(),
+      ['Owner', 'Writer'],
+    );
+    assert.doesNotMatch(
+      readFileSync(join(owner.store.directory, 'shared.json'), 'utf8'),
+      /DO_NOT_STORE_DRAFT|Forged owner|00000000-0000-4000-8000-000000000001/,
+    );
     const signed = reader.shared.signed(chat.id, readerToken, 'snapshot', {});
     const snapshot = owner.shared.rpc(signed, readerToken) as { role: string; messages: unknown[] };
     assert.equal(snapshot.role, 'reader');
@@ -129,6 +152,10 @@ test('reader/writer authorization, proof binding, queue attribution, role revoca
       writer.shared.identity.public().id,
     );
     owner.shared.member(chat.id, writer.shared.identity.public().id, 'reader');
+    assert.deepEqual(
+      owner.shared.typingPeople(chat.id).map((person) => person.name),
+      ['Owner'],
+    );
     owner.agents.pauseQueue(chat, false);
     assert.deepEqual(calls, []);
     assert.equal(owner.agents.queues.state(chat.id).items.length, 0);
@@ -152,6 +179,7 @@ test('reader/writer authorization, proof binding, queue attribution, role revoca
     owner.shared.access(chat.id, false);
     assert.throws(() => rpc(reader, readerToken, 'snapshot'), /off/);
     owner.shared.access(chat.id, true);
+    assert.deepEqual(owner.shared.typingPeople(chat.id), []);
     assert.throws(() => rpc(reader, readerToken, 'snapshot'), /revoked/);
     owner.shared.member(chat.id, reader.shared.identity.public().id, 'removed');
     const newInvitation = owner.shared.invitation(chat.id, 'reader');
@@ -300,6 +328,23 @@ test('LAN gateway uses pinned TLS and scoped signed invitations, never exposes t
     assert.equal(privateStatus, 404);
     assert.equal(owner.store.list().length, 1);
     owner.shared.member(chat.id, client.shared.identity.public().id, 'writer');
+    await remoteCall(
+      invitation,
+      joined.token,
+      client.shared.signed(chat.id, joined.token, 'typing', {
+        client: '00000000-0000-4000-8000-000000000001',
+        active: true,
+      }),
+    );
+    const presence = (await remoteCall(
+      invitation,
+      joined.token,
+      client.shared.signed(chat.id, joined.token, 'snapshot', {}),
+    )) as { typing: { name: string }[] };
+    assert.deepEqual(
+      presence.typing.map((person) => person.name),
+      ['Client'],
+    );
     const content = Buffer.alloc(MAX_SHARED_FILE, 42).toString('base64');
     await remoteCall(
       invitation,

@@ -5,6 +5,7 @@ import type { AgentService } from './agent.js';
 import type { ChatStore } from './store.js';
 import { InstallationIdentity, proof, validPeer, type PeerIdentity } from './shared-identity.js';
 import { digest, emptyProject, overlaps, SharedFiles } from './shared-files.js';
+import { SharedTyping, type TypingPerson } from './shared-typing.js';
 
 export type SharedRole = 'reader' | 'writer';
 interface Member extends PeerIdentity {
@@ -74,6 +75,7 @@ export class SharedService {
   private file: string;
   private state: { shares: Share[]; remotes: RemoteShare[] };
   private nonces = new Map<string, number>();
+  private typing = new SharedTyping();
   constructor(
     readonly store: ChatStore,
     private agents: AgentService,
@@ -168,6 +170,7 @@ export class SharedService {
     if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
     share.enabled = enabled;
     if (!enabled) {
+      this.typing.clear(id);
       share.invites = {};
       share.members.forEach((member) => {
         member.tokenHash = '';
@@ -198,6 +201,7 @@ export class SharedService {
       member.role = role;
       member.blocked = false;
     }
+    this.typing.clear(id, memberId);
     member.grantId = randomUUID();
     this.share(id).invites = {};
     this.save();
@@ -217,6 +221,28 @@ export class SharedService {
           member.grantId === grant,
       )
     );
+  }
+  typingPeople(id: string): TypingPerson[] {
+    const share = this.share(id);
+    if (!share.enabled) {
+      this.typing.clear(id);
+      return [];
+    }
+    const owner = this.identity.public();
+    return this.typing.actors(id).flatMap((actor) => {
+      if (actor === owner.id) return [{ id: owner.id, name: owner.name }];
+      const member = share.members.find(
+        (member) =>
+          member.id === actor && member.role === 'writer' && !member.blocked && !!member.tokenHash,
+      );
+      return member ? [{ id: member.id, name: member.name }] : [];
+    });
+  }
+  ownerTyping(id: string, client: unknown, active: unknown) {
+    const share = this.share(id);
+    if (!share.enabled && active !== false) throw new Error('Sharing is off');
+    this.typing.update(id, this.identity.public().id, client, active);
+    return { ok: true };
   }
   files(id: string) {
     return new SharedFiles(this.share(id).root);
@@ -338,6 +364,7 @@ export class SharedService {
         member = { ...request.peer, role, tokenHash: digest(accessToken), grantId: randomUUID() };
         share.members.push(member);
       }
+      this.typing.clear(share.id, member.id);
       this.save();
       return {
         token: accessToken,
@@ -375,6 +402,7 @@ export class SharedService {
         title: snapshot.chat.title,
         owner: this.identity.public(),
         role: member.role,
+        typing: this.typingPeople(share.id),
         historyLimited:
           snapshot.messages.length > 100 ||
           snapshot.messages.some((message) => message.text.length > 20000),
@@ -398,9 +426,14 @@ export class SharedService {
       return this.files(share.id).read(data.path);
     }
     if (member.role !== 'writer') throw new Error('Read-only participant');
+    if (request.operation === 'typing') {
+      this.typing.update(share.id, member.id, data.client, data.active);
+      return { ok: true };
+    }
     if (request.operation === 'message') {
       if (typeof data.text !== 'string' || !data.text.trim() || data.text.length > 100000)
         throw new Error('Invalid prompt');
+      this.typing.clear(share.id, member.id);
       const text = `[Writer · ${member.name}]\n${data.text.trim()}`;
       if (this.agents.settings.read().queuesEnabled)
         this.agents.enqueue(this.store.get(share.id)!, text, undefined, member.id, member.grantId);

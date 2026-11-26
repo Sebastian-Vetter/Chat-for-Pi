@@ -35,6 +35,7 @@ import { version as appVersion } from '../package.json';
 import CommandPalette, { type PaletteAction } from './CommandPalette';
 import TaskPanel from './TaskPanel';
 import WorkDock from './WorkDock';
+import { TypingIndicator, useSharedTyping } from './SharedTyping';
 import ConversationActions from './ConversationActions';
 import './productivity.css';
 import {
@@ -240,6 +241,7 @@ export default function App() {
   async function send(event?: FormEvent) {
     event?.preventDefault();
     if (!draft.trim() || submitting.current) return;
+    ownedTyping.stop();
     const command = draft.trim();
     const localCommands: Record<string, () => void> = {
       '/help': () => setCommandsOpen(true),
@@ -338,6 +340,11 @@ export default function App() {
     }
   }
   const currentChat = chats.find((chat) => chat.id === active);
+  const typingEnabled =
+    !remote &&
+    !!currentChat?.shared &&
+    !!sharing.listing.owned.find((share) => share.id === active)?.enabled;
+  const ownedTyping = useSharedTyping(typingEnabled ? active : null, false, typingEnabled);
   const messages = snapshot?.messages ?? [];
   const selectedModel = model || snapshot?.model || '';
   const runningCount = Object.values(runningChats).filter(Boolean).length;
@@ -541,6 +548,7 @@ export default function App() {
               id={remote}
               changed={refreshShared}
               roleChanged={setRemoteRole}
+              identityId={sharing.listing.owner.id}
               sidebarControl={
                 !sidebar && (
                   <button
@@ -719,6 +727,9 @@ export default function App() {
                   </button>
                 </div>
               )}
+              {typingEnabled && (
+                <TypingIndicator people={ownedTyping.people} self={sharing.listing.owner.id} />
+              )}
               <form
                 className={`composer ${busy ? 'composer-working' : ''}`}
                 aria-label="Message composer"
@@ -740,7 +751,11 @@ export default function App() {
                   }
                   rows={2}
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    ownedTyping.changed(e.target.value);
+                  }}
+                  onBlur={ownedTyping.stop}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
