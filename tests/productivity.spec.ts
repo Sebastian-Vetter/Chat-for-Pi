@@ -72,11 +72,11 @@ async function openConversation(page: Page, id: string) {
     };
   }, id);
   await page.goto('/');
-  await expect(page.getByRole('checkbox', { name: 'Require action approvals' })).toBeVisible();
+  await expect(page.locator('.task-plan summary')).toBeVisible();
 }
 
 for (const width of [1280, 390]) {
-  test(`pinning, folders, task plans, approval settings and prompt templates persist at ${width}px`, async ({
+  test(`pinning, folders and task plans persist in a quiet interface at ${width}px`, async ({
     page,
     request,
   }) => {
@@ -84,6 +84,12 @@ for (const width of [1280, 390]) {
     const chat = await (await request.post('/api/chats', { data: { cwd: process.cwd() } })).json();
     await request.patch(`/api/chats/${chat.id}`, { data: { title: `Workflow ${chat.id}` } });
     try {
+      await page.addInitScript(() =>
+        localStorage.setItem(
+          'pi-chat-prompt-templates',
+          JSON.stringify([{ name: 'Old review', shortcut: '/my-review', text: 'Old expansion' }]),
+        ),
+      );
       await openConversation(page, chat.id);
       if (width < 760)
         await page.getByRole('button', { name: 'Open sidebar', exact: true }).click();
@@ -128,25 +134,12 @@ for (const width of [1280, 390]) {
         .click();
       await expect(page.locator('.plan-status')).toHaveText('✓ Done');
 
-      page.once('dialog', (dialog) => dialog.accept());
-      await page.getByRole('checkbox', { name: 'Require action approvals', exact: true }).click();
-      await expect(
-        page.getByRole('checkbox', { name: 'Require action approvals', exact: true }),
-      ).toBeChecked();
-      await page.getByRole('button', { name: 'Templates', exact: true }).click();
-      const dialog = page.getByRole('dialog', { name: 'Prompt templates', exact: true });
-      await dialog.getByRole('textbox', { name: 'Template name' }).fill('My custom review');
-      await dialog.getByRole('textbox', { name: 'Template shortcut' }).fill('/my-review');
-      await dialog
-        .getByRole('textbox', { name: 'Template prompt' })
-        .fill('Inspect the current code without editing files.');
-      await dialog.getByRole('button', { name: 'Save template', exact: true }).click();
-      await dialog.getByRole('button', { name: /My custom review.*\/my-review/ }).click();
-      await expect(page.getByRole('textbox', { name: 'Message Pi', exact: true })).toHaveValue(
-        'Inspect the current code without editing files.',
-      );
+      await expect(page.getByRole('checkbox', { name: 'Require action approvals' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Templates', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Usage limits', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Export chat', exact: true })).toHaveText('');
 
-      // No inference: intercept the submission and check shortcut expansion at the boundary.
+      // No inference: removed template shortcuts must be submitted verbatim.
       await page.route(`**/api/chats/${chat.id}/messages`, (route) =>
         route.fulfill({ status: 202, json: { ok: true } }),
       );
@@ -157,18 +150,9 @@ for (const width of [1280, 390]) {
         req.url().endsWith(`/api/chats/${chat.id}/messages`),
       );
       await page.getByRole('button', { name: 'Send message', exact: true }).click();
-      expect((await sent).postDataJSON().text).toBe(
-        'Inspect the current code without editing files.\n\nsrc/App.tsx',
-      );
+      expect((await sent).postDataJSON().text).toBe('/my-review src/App.tsx');
       await page.reload();
-      await expect(
-        page.getByRole('checkbox', { name: 'Require action approvals', exact: true }),
-      ).toBeChecked();
       await expect(page.locator('.task-plan')).toContainText('1/1 done');
-      await page.getByRole('button', { name: 'Templates', exact: true }).click();
-      await expect(page.getByRole('dialog', { name: 'Prompt templates' })).toContainText(
-        'My custom review',
-      );
       const persisted = await (await request.get(`/api/chats/${chat.id}`)).json();
       expect(persisted.chat.folder).toBe('My project folder');
       expect(persisted.chat.plan[0].status).toBe('done');
@@ -218,12 +202,10 @@ test('command palette finds chats, projects, models and actions with keyboard na
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
     await page.keyboard.press('Control+k');
-    await search.fill('Weekly');
-    await search.press('Enter');
-    await expect(page.getByRole('dialog', { name: 'Subscription usage limits' })).toBeVisible();
-    await expect(page.getByRole('dialog', { name: 'Subscription usage limits' })).toContainText(
-      'disabled',
-    );
+    await search.fill('Usage limits');
+    await expect(dialog.getByRole('option')).toHaveCount(0);
+    await search.fill('Prompt templates');
+    await expect(dialog.getByRole('option')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+Shift+n');
     await expect(page.locator('.welcome')).toBeVisible();
@@ -260,8 +242,14 @@ test('Markdown downloads support the complete chat or selected visible answers',
     expect(full.suggestedFilename()).toMatch(/\.md$/);
     expect(await readFile((await full.path())!, 'utf8')).toContain('Original question');
     await page.getByRole('checkbox', { name: 'Select response for export' }).nth(1).check();
+    const selectedExport = page.getByRole('button', { name: 'Export selected (1)', exact: true });
+    await expect(selectedExport).toHaveText('');
+    await expect(selectedExport).toHaveAttribute(
+      'title',
+      'Export 1 selected responses as Markdown',
+    );
     const partialDownload = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export selected (1)', exact: true }).click();
+    await selectedExport.press('Enter');
     const partial = await readFile((await (await partialDownload).path())!, 'utf8');
     expect(partial).toContain('Selected second answer');
     expect(partial).not.toContain('First visible answer');

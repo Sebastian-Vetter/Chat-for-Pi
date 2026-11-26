@@ -32,9 +32,7 @@ import Updates from './Updates';
 import './commands.css';
 import { version as appVersion } from '../package.json';
 import CommandPalette, { type PaletteAction } from './CommandPalette';
-import PromptTemplates, { readTemplates, expandTemplate } from './PromptTemplates';
 import TaskPanel from './TaskPanel';
-import UsageLimits from './UsageLimits';
 import ConversationActions from './ConversationActions';
 import './productivity.css';
 
@@ -55,9 +53,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [usageOpen, setUsageOpen] = useState(false);
-  const [templates, setTemplates] = useState(readTemplates);
   const [selectedResponses, setSelectedResponses] = useState<number[]>([]);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [piSessionsOpen, setPiSessionsOpen] = useState(false);
@@ -229,7 +224,7 @@ export default function App() {
     setSending(true);
     setError('');
     scrollToLatest();
-    const text = expandTemplate(draft, templates);
+    const text = draft;
     try {
       let id = active;
       if (!id) {
@@ -308,19 +303,7 @@ export default function App() {
   const latestCommand = snapshot?.events?.findLast(
     (event) => event.label.startsWith('/') && event.status === 'passed',
   );
-  const activeProvider = snapshot?.model?.split('/')[0];
-  const usageProvider =
-    activeProvider === 'anthropic' || activeProvider === 'openai-codex'
-      ? activeProvider
-      : (config?.usageProviders?.[0] ?? 'openai-codex');
   const paletteActions: PaletteAction[] = [
-    {
-      id: 'usage',
-      kind: 'Action',
-      label: 'Usage limits',
-      detail: 'Weekly and 5-hour subscription allowances',
-      run: () => setUsageOpen(true),
-    },
     { id: 'new', kind: 'Action', label: 'New chat', run: newChat },
     {
       id: 'workspace',
@@ -330,12 +313,6 @@ export default function App() {
     },
     { id: 'settings', kind: 'Action', label: 'Settings', run: () => setSettingsOpen(true) },
     { id: 'tools', kind: 'Action', label: 'Workspace tools', run: () => setInspectorOpen(true) },
-    {
-      id: 'templates',
-      kind: 'Action',
-      label: 'Prompt templates',
-      run: () => setTemplatesOpen(true),
-    },
     { id: 'commands', kind: 'Action', label: 'Web commands', run: () => setCommandsOpen(true) },
     ...chats.map((chat) => ({
       id: `chat-${chat.id}`,
@@ -363,16 +340,6 @@ export default function App() {
       label: item.name,
       detail: item.key,
       run: () => setModel(item.key),
-    })),
-    ...templates.map((item) => ({
-      id: `template-${item.shortcut}`,
-      kind: 'Template',
-      label: item.name,
-      detail: item.shortcut,
-      run: () => {
-        setDraft(item.text);
-        textarea.current?.focus();
-      },
     })),
   ];
   return (
@@ -504,12 +471,8 @@ export default function App() {
           chat={currentChat}
           messages={messages}
           selectedResponses={selectedResponses}
-          busy={busy}
           mac={mac}
           openPalette={() => setPaletteOpen(true)}
-          openTemplates={() => setTemplatesOpen(true)}
-          openUsage={() => setUsageOpen(true)}
-          update={updateChat}
         />
         <PromptQueue snapshot={snapshot} onError={setError} />
         <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
@@ -704,23 +667,8 @@ export default function App() {
           close={() => setInspectorOpen(false)}
         />
       )}
-      {usageOpen && (
-        <UsageLimits initialProvider={usageProvider} close={() => setUsageOpen(false)} />
-      )}
       {paletteOpen && (
         <CommandPalette actions={paletteActions} close={() => setPaletteOpen(false)} />
-      )}
-      {templatesOpen && (
-        <PromptTemplates
-          templates={templates}
-          save={setTemplates}
-          close={() => setTemplatesOpen(false)}
-          choose={(text) => {
-            setDraft(text);
-            setTemplatesOpen(false);
-            textarea.current?.focus();
-          }}
-        />
       )}
       {commandsOpen && (
         <Commands

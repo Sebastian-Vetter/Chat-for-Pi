@@ -227,9 +227,7 @@ Click **Commands /** below the composer or type `/help` to see supported command
 - Small version label at the bottom-left, Settings, and Mac shortcut reference
 - Jump to the latest reply with an unread hint while reading older messages
 - Persistent pinned chats, custom folders, and project/folder grouping
-- Visible task checklists, Markdown exports, browser-local prompt templates, and a searchable command palette
-- Opt-in per-conversation execution approvals for file changes, shell commands, and configured tests
-- Provider-reported 5-hour and weekly subscription limits for supported OAuth accounts
+- Visible task checklists, discreet icon-only Markdown exports, and a searchable command palette
 - Enter to send/queue, ⇧↵ for a newline, ⌘K for the command palette, ⌘⇧N for a new chat, ⌘, for Settings, ⌘⇧E for workspace tools (Ctrl equivalents on other platforms)
 
 Choose a workspace using the folder button **before sending a new conversation**. Existing conversations retain their original directory. The default is this project's parent directory (`coding`). A workspace path is validated when the conversation is created.
@@ -242,7 +240,7 @@ Start a new conversation while another runs to work in parallel; sidebar spinner
 
 While Pi works, enter more prompts and press **Queue** or Enter. Pending prompts run sequentially in that conversation. Remove individual items or pause/resume the queue. **Stop** pauses the queue as well as aborting the current response. Provider failures also pause it. After a backend restart, saved pending/in-flight prompts are recovered **paused** for review; retrying interrupted work may repeat changes already made before the interruption.
 
-## Navigation, plans, templates, and export
+## Navigation, plans, and export
 
 Scrolling upward pauses automatic following and reveals **Jump to latest** above the composer. A **New reply** hint appears when assistant text arrives while paused. Click the button or scroll back to the bottom to resume following. Opening another chat always starts at the latest content.
 
@@ -252,27 +250,19 @@ Use a conversation's **Pin** action to keep it above recent chats. **Move to fol
 
 Plan edits are persisted and protected by a revision check. If Pi or another browser changes the plan during an edit or drag, review the refreshed plan and try again; stale edits are never retried automatically. Pi's `update_plan` tool reads the current steps and revision before replacing the checklist, preventing stale model updates from overwriting your additions or ordering. Unfinished steps are not automatically marked done when a run stops. **The plan remains a checklist, not an execution queue:** adding or moving a step does not start a model prompt or enqueue a new task.
 
-**Export chat** downloads the visible conversation as Markdown, including fenced tool output. Use the **Export** checkboxes below assistant answers and **Export selected** to download only those answers. No hidden thinking or credentials are added to exports; visible messages and tool output can themselves contain sensitive information.
+The small **download icon** exports the visible conversation as Markdown, including fenced tool output. Use the **Export** checkboxes below assistant answers and the selected-response export icon to download only those answers. Both icons have tooltips and accessible labels, without visible button text. No hidden thinking or credentials are added to exports; visible messages and tool output can themselves contain sensitive information.
 
-**Templates** manages browser-local prompt templates, initially `/review` (Code Review), `/debug` (Fehler analysieren), and `/tests` (Tests ergänzen). Choose a template to fill the composer without sending. Typing its shortcut followed by optional task context expands it when sent or queued. Custom shortcuts cannot replace built-in commands. Clearing browser storage removes custom templates.
+The toolbar intentionally omits Templates, Usage limits, and the Require approvals switch. Saved browser templates are no longer read or expanded; existing local storage and conversation data are not deleted. No subscription-limit checks are initiated by the interface.
 
-Press **⌘/Ctrl K** or click **Search** for the command palette. Search chats (including archived chats), projects from conversation workspaces, available models, templates, and actions. Use arrow keys and Enter to choose; Escape closes it. Choosing a model selects it for the next submitted prompt, not an already-running response. New chat is now **⌘/Ctrl Shift N**.
+Press **⌘/Ctrl K** or click **Search** for the command palette. Search chats (including archived chats), projects from conversation workspaces, available models, and actions. Use arrow keys and Enter to choose; Escape closes it. Choosing a model selects it for the next submitted prompt, not an already-running response. New chat is now **⌘/Ctrl Shift N**.
 
-## Action approvals
+## Existing approval-protected conversations
 
-Enable **Require approvals** in an idle conversation to require a proposal before each `write`, `edit`, `bash`, `powershell`, or configured test command. The backend waits before invoking the underlying file/shell tool or spawning a test process. Read-only tools and research children remain available; arbitrary CLI extensions, MCP, and codemode are not enabled in this web host.
+The approval-mode switch has been removed from the interface. Existing conversations with approval mode enabled retain their backend protection rather than silently authorizing previously gated actions. Their proposals still appear before `write`, `edit`, `bash`, `powershell`, or configured test execution. New conversations keep the default mode disabled. The local metadata API remains available for explicit idle-time mode changes; the interface does not change the mode automatically. Read-only tools and research children remain available.
 
 The approval panel shows the workspace and complete action arguments: replacement content/edits for file changes, or the exact shell/test invocation. **Approve once** authorizes only that pending action; **Reject**, Stop, expiry (10 minutes), and server shutdown fail closed. Requests cannot be approved from another chat or replayed. Pending approvals are not restored after a restart. Denied agent actions return a terminating error result and pause the prompt queue; already-approved concurrent actions are not rolled back. Decisions are recorded in Activity with a bounded argument preview. Approval mode cannot be changed during an active agent/test run.
 
 This is **not a sandbox or a transaction**. Approved shell commands and test scripts can execute arbitrary trusted local code, including lifecycle hooks, and access files beyond the workspace. Other local processes can change files/configuration while you review a proposal. Read-only tools can still read sensitive files. With the mode disabled (the default, preserving existing behavior), Pi can change files and run commands without these additional approvals. Do not expose this single-user app to other users or the network.
-
-## Subscription usage limits
-
-Click **Usage limits**, or find it in the command palette, to view your account-wide **5-hour** and **weekly** allowance: provider-reported percentage remaining/used and reset time. Usage outside the current chat is included. This is separate from the context-window token estimate and from API billing.
-
-OpenAI Codex/ChatGPT and Anthropic/Claude OAuth subscriptions are supported when the provider exposes its usage endpoint. Sign in to the matching provider through Pi first. API-key accounts and other providers may not have these windows. Missing windows, expired logins, unsupported response formats, offline errors, and provider rejections are shown explicitly; the app never fabricates allowance values. Provider usage endpoints may change or become unavailable; the dialog includes a link to the provider's usage page.
-
-Checks happen only when opening the dialog or clicking Refresh, not automatically on app startup. They send an authenticated metadata GET to the fixed provider endpoint, **not a model prompt**, and do not consume model tokens. OAuth resolution/refresh uses Pi's existing server-side credential handling; tokens and raw provider/account payloads never reach the browser or app logs. Requests reject redirects, have a five-second network/auth deadline, limit response size to 256 KiB, coalesce concurrent checks, and cache results for one minute. Set `CHAT_USAGE_CHECK=0` to disable checks. Managed services preserve this opt-out when explicitly started/restarted; active services are never restarted automatically.
 
 ## Workspace tools
 
@@ -294,7 +284,7 @@ App-managed chat metadata, Pi JSONL sessions, activity, and prompt queues are sa
 
 Deleting a chat removes its app-managed session history, not the files the agent created or changed in its workspace. Files are not automatically reverted when you delete a conversation or stop a response.
 
-**This is a trusted, single-user local application, not a sandbox.** Pi can run shell commands and edit files with your user permissions, including outside the working directory. Additional per-action approval is available through the opt-in **Require approvals** mode described above; it is disabled by default and does not provide filesystem or process isolation. Review changes and do not expose this app through a tunnel, public reverse proxy, or network interface. Loopback binding, host/origin validation, JSON-only mutations, and no cross-origin API access help protect the local service; they are not multi-user authentication.
+**This is a trusted, single-user local application, not a sandbox.** Pi can run shell commands and edit files with your user permissions, including outside the working directory. Existing approval-enabled conversations retain the protection described above; the interface no longer exposes a mode switch. Approval mode is disabled by default and does not provide filesystem or process isolation. Review changes and do not expose this app through a tunnel, public reverse proxy, or network interface. Loopback binding, host/origin validation, JSON-only mutations, and no cross-origin API access help protect the local service; they are not multi-user authentication.
 
 Keep only one backend process per data directory. Transcripts and tool output can contain sensitive information. This version does not support file attachments, interactive session-tree navigation, hosted CI integrations, or multi-user access. Test commands and package scripts are executable code: run them only in trusted workspaces.
 

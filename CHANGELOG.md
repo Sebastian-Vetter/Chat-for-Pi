@@ -4,6 +4,18 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-26
+
+### Changed
+
+- Simplified the conversation toolbar: removed Templates, Usage limits, and Require approvals controls, along with template/usage command-palette entries and dialogs. Template shortcuts are no longer expanded, and the interface makes no subscription-limit requests. Existing browser storage and conversation data are preserved.
+- Chat and selected-response exports use small, subdued icons at the edge of the toolbar, without visible button text. Tooltips, accessible labels, keyboard activation, and touch-sized hit targets remain available.
+- Existing approval-enabled conversations retain their backend protections and pending approval proposals; removing the switch does not silently authorize gated execution.
+
+### Tests
+
+- Updated desktop/mobile interface and palette regressions for removed controls and legacy templates, verified no usage checks, and retained real approval-gating and Markdown download coverage, including keyboard activation of icon-only exports.
+
 ## [1.1.1] - 2026-11-26
 
 ### Added

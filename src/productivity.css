@@ -10,7 +10,37 @@
   font-size: 11px;
   padding: 5px 9px;
 }
-.approval-toggle,
+.conversation-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #aab4a6;
+  cursor: pointer;
+}
+.export-chat {
+  margin-left: auto;
+}
+.conversation-export:hover:not(:disabled),
+.conversation-export:focus-visible {
+  background: #ffffff0b;
+  color: #d4dfce;
+}
+.conversation-export:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .conversation-export {
+    width: 44px;
+    height: 44px;
+  }
+}
 .export-selection {
   display: inline-flex;
   align-items: center;
@@ -18,7 +48,6 @@
   font-size: 11px;
   color: #aab4a6;
 }
-.approval-toggle input,
 .export-selection input {
   width: auto;
 }
@@ -154,7 +183,6 @@
   overflow: auto;
 }
 .productivity-dialog input,
-.productivity-dialog textarea,
 .task-plan input,
 .session-grouping select {
   background: #151b15;
@@ -197,30 +225,6 @@
   font-size: 11px;
   overflow-wrap: anywhere;
 }
-.template-list > div {
-  display: flex;
-  gap: 6px;
-  margin: 8px 0;
-  flex-wrap: wrap;
-}
-.template-list > div > button:first-child {
-  flex: 1;
-  text-align: left;
-}
-.template-list small {
-  color: #90ae82;
-  margin-left: 8px;
-}
-.template-editor label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin: 12px 0;
-  font-size: 12px;
-}
-.template-editor textarea {
-  resize: vertical;
-}
 .session-grouping {
   display: flex;
   align-items: center;
@@ -251,28 +255,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.usage-window {
-  margin: 14px 0;
-  padding: 14px;
-  border: 1px solid #b5d7a52b;
-  border-radius: 9px;
-}
-.usage-window h3 {
-  margin: 0 0 12px;
-  font-size: 13px;
-}
-.usage-window strong {
-  font-size: 21px;
-  font-weight: 500;
-  color: #c5daba;
-}
-.usage-window progress {
-  display: block;
-  width: 100%;
-  height: 8px;
-  margin-top: 14px;
-  accent-color: #b5d7a5;
 }
 .conversation-scroll:focus-visible {
   outline: 1px solid #b5d7a566;
