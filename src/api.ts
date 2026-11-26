@@ -47,6 +47,10 @@ export interface Snapshot {
   error?: string;
   model?: string;
 }
+export interface QueueSettings {
+  queuesEnabled: boolean;
+  revision: number;
+}
 export interface Config {
   version: string;
   defaultCwd: string;

@@ -93,6 +93,65 @@ test('local API validates requests and persists a chat lifecycle', { timeout: 45
     const snapshot = await (await request(`/chats/${chat.id}`)).json();
     assert.deepEqual(snapshot.messages, []);
     assert.equal(snapshot.busy, false);
+    assert.deepEqual(await (await request('/settings')).json(), {
+      queuesEnabled: true,
+      revision: 0,
+    });
+    for (const body of [{}, { queuesEnabled: 'false' }, { queuesEnabled: false, other: true }])
+      assert.equal((await request('/settings', 'PATCH', body)).status, 400);
+    assert.equal(
+      (
+        await request(
+          '/settings',
+          'PATCH',
+          { queuesEnabled: false },
+          { Origin: 'https://evil.example' },
+        )
+      ).status,
+      403,
+    );
+    await request(`/chats/${chat.id}/queue`, 'PATCH', { paused: true });
+    await request(`/chats/${chat.id}/messages`, 'POST', {
+      text: 'Saved pending task',
+      enqueue: true,
+    });
+    const policyStream = await request('/events');
+    const policyReader = policyStream.body!.getReader();
+    assert.match(
+      new TextDecoder().decode((await policyReader.read()).value),
+      /"queuesEnabled":true/,
+    );
+    assert.deepEqual(await (await request('/settings', 'PATCH', { queuesEnabled: false })).json(), {
+      queuesEnabled: false,
+      revision: 1,
+    });
+    assert.match(
+      new TextDecoder().decode((await policyReader.read()).value),
+      /"type":"settings".*"queuesEnabled":false/,
+    );
+    await policyReader.cancel();
+    assert.equal(
+      (
+        await request(`/chats/${chat.id}/messages`, 'POST', {
+          text: 'Must not enqueue',
+          enqueue: true,
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (await request(`/chats/${chat.id}/queue`, 'PATCH', { paused: false })).status,
+      409,
+    );
+    const disabled = await (await request(`/chats/${chat.id}`)).json();
+    assert.equal(disabled.queue.length, 1);
+    assert.equal(disabled.queuePaused, true);
+    assert.equal(disabled.busy, false);
+    await request('/settings', 'PATCH', { queuesEnabled: true });
+    const reenabled = await (await request(`/chats/${chat.id}`)).json();
+    assert.equal(reenabled.queuePaused, true);
+    assert.equal(reenabled.busy, false);
+    assert.deepEqual(reenabled.messages, []);
     const stream = await fetch(`${base}/chats/${chat.id}/events`);
     const reader = stream.body!.getReader();
     const { value } = await reader.read();

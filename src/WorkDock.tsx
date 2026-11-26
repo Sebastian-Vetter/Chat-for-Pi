@@ -8,12 +8,27 @@ type View = 'plan' | 'queue';
 
 export default function WorkDock({
   snapshot,
+  showPlan,
+  queuesEnabled,
   onError,
 }: {
   snapshot?: Snapshot;
+  showPlan: boolean;
+  queuesEnabled: boolean;
   onError: (message: string) => void;
 }) {
-  const [view, setView] = useState<View>();
+  const [requestedView, setView] = useState<View>();
+  const view =
+    requestedView === 'plan'
+      ? showPlan
+        ? 'plan'
+        : undefined
+      : queuesEnabled
+        ? requestedView
+        : undefined;
+  useEffect(() => {
+    if (!view) setView(undefined);
+  }, [view]);
   const [confirmed, setConfirmed] = useState<Chat>();
   const root = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -68,6 +83,7 @@ export default function WorkDock({
   return (
     <div
       className="work-dock"
+      hidden={!showPlan && !queuesEnabled}
       ref={root}
       onBlurCapture={(event) => {
         if (
@@ -78,33 +94,39 @@ export default function WorkDock({
       }}
     >
       <div className="work-summary" aria-label="Plan and queue">
-        <button
-          ref={planButton}
-          type="button"
-          aria-label={view === 'plan' ? 'Hide task plan' : 'Show task plan'}
-          aria-expanded={view === 'plan'}
-          aria-controls={`${id}-plan`}
-          onClick={() => setView((current) => (current === 'plan' ? undefined : 'plan'))}
-        >
-          <ListChecks size={14} aria-hidden="true" />
-          <span>Task plan</span>
-          <span className="work-count">
-            {steps.filter((step) => step.status === 'done').length}/{steps.length}
-          </span>
-        </button>
-        <button
-          ref={queueButton}
-          type="button"
-          aria-label={view === 'queue' ? 'Hide prompt queue' : 'Show prompt queue'}
-          aria-expanded={view === 'queue'}
-          aria-controls={`${id}-queue`}
-          onClick={() => setView((current) => (current === 'queue' ? undefined : 'queue'))}
-        >
-          <ListOrdered size={14} aria-hidden="true" />
-          <span>Queue</span>
-          <span className="work-count">{queue.length} queued</span>
-          {queue.length > 0 && snapshot?.queuePaused && <span className="work-paused">Paused</span>}
-        </button>
+        {showPlan && (
+          <button
+            ref={planButton}
+            type="button"
+            aria-label={view === 'plan' ? 'Hide task plan' : 'Show task plan'}
+            aria-expanded={view === 'plan'}
+            aria-controls={`${id}-plan`}
+            onClick={() => setView((current) => (current === 'plan' ? undefined : 'plan'))}
+          >
+            <ListChecks size={14} aria-hidden="true" />
+            <span>Task plan</span>
+            <span className="work-count">
+              {steps.filter((step) => step.status === 'done').length}/{steps.length}
+            </span>
+          </button>
+        )}
+        {queuesEnabled && (
+          <button
+            ref={queueButton}
+            type="button"
+            aria-label={view === 'queue' ? 'Hide prompt queue' : 'Show prompt queue'}
+            aria-expanded={view === 'queue'}
+            aria-controls={`${id}-queue`}
+            onClick={() => setView((current) => (current === 'queue' ? undefined : 'queue'))}
+          >
+            <ListOrdered size={14} aria-hidden="true" />
+            <span>Queue</span>
+            <span className="work-count">{queue.length} queued</span>
+            {queue.length > 0 && snapshot?.queuePaused && (
+              <span className="work-paused">Paused</span>
+            )}
+          </button>
+        )}
       </div>
       <div
         className="work-popover"

@@ -6,25 +6,14 @@ interface Props {
   chat?: Chat;
   messages: Message[];
   selectedResponses: number[];
-  mac: boolean;
-  openPalette: () => void;
 }
 
-export default function ConversationActions({
-  chat,
-  messages,
-  selectedResponses,
-  mac,
-  openPalette,
-}: Props) {
+export default function ConversationActions({ chat, messages, selectedResponses }: Props) {
   const selected = messages.filter(
     (message, index) => message.role === 'assistant' && selectedResponses.includes(index),
   );
   return (
     <div className="conversation-actions" aria-label="Conversation actions">
-      <button className="secondary-button" onClick={openPalette}>
-        Search / {mac ? '⌘ K' : 'Ctrl K'}
-      </button>
       <button
         className="conversation-export export-chat"
         aria-label="Export chat"

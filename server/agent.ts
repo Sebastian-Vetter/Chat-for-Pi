@@ -12,6 +12,7 @@ import type { ChatRecord, ChatStore } from './store.js';
 import { conversationInstructions } from './instructions.js';
 import { ActivityLog } from './activity.js';
 import { PromptQueues } from './queue.js';
+import { AppSettings } from './settings.js';
 import { Subagents } from './subagents.js';
 import { Approvals } from './approvals.js';
 import { approvedTools, planTool } from './work-tools.js';
@@ -66,6 +67,7 @@ export class AgentService {
   private summaries = new Map<string, string>();
   private closing = false;
   readonly queues: PromptQueues;
+  readonly settings: AppSettings;
   private subagents: Subagents;
   readonly approvals: Approvals;
   constructor(
@@ -73,6 +75,7 @@ export class AgentService {
     readonly activity = new ActivityLog(join(store.directory, 'activity')),
   ) {
     this.queues = new PromptQueues(join(store.directory, 'queues'));
+    this.settings = new AppSettings(join(store.directory, 'settings.json'));
     this.approvals = new Approvals(
       (record) => this.publish(record),
       (record, request, approved) => {
@@ -108,19 +111,42 @@ export class AgentService {
       this.globalListeners.delete(fn);
     };
   }
+  setQueuesEnabled(enabled: boolean) {
+    if (this.settings.read().queuesEnabled === enabled) return this.settings.read();
+    // Disable first so even a failed pause/save cannot launch another queued prompt.
+    if (!enabled) this.settings.update(false);
+    for (const record of this.store.list()) {
+      if (!this.queues.state(record.id).items.length) continue;
+      this.queues.pause(record.id, true);
+      this.publish(record);
+    }
+    // Re-enabling never resumes saved prompts without a separate per-chat decision.
+    if (enabled) this.settings.update(true);
+    return this.settings.read();
+  }
   enqueue(record: ChatRecord, text: string, model?: string) {
+    if (!this.settings.read().queuesEnabled)
+      throw new Error('Prompt queues are disabled. Enable them in Settings first.');
     if (this.closing) throw new Error('Server is shutting down');
     this.queues.add(record.id, text, model);
     this.publish(record);
     this.drain(record);
   }
   pauseQueue(record: ChatRecord, paused: boolean) {
+    if (!paused && !this.settings.read().queuesEnabled)
+      throw new Error('Prompt queues are disabled. Enable them in Settings first.');
     this.queues.pause(record.id, paused);
     this.publish(record);
     if (!paused) this.drain(record);
   }
   private drain(record: ChatRecord) {
-    if (this.closing || this.busy(record.id) || !this.store.get(record.id)) return;
+    if (
+      this.closing ||
+      !this.settings.read().queuesEnabled ||
+      this.busy(record.id) ||
+      !this.store.get(record.id)
+    )
+      return;
     const next = this.queues.take(record.id);
     if (!next) return;
     void this.prompt(record, next.text, next.model)

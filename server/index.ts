@@ -84,6 +84,17 @@ app.get('/api/config', async (_req, res) => {
     usageProviders: USAGE_PROVIDERS.filter((provider) => runtime.isUsingOAuth(provider)),
   });
 });
+app.get('/api/settings', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(agents.settings.read());
+});
+app.patch('/api/settings', (req, res) => {
+  if (typeof req.body?.queuesEnabled !== 'boolean' || Object.keys(req.body).length !== 1) {
+    res.status(400).json({ error: 'queuesEnabled must be a boolean and sent on its own' });
+    return;
+  }
+  res.json(agents.setQueuesEnabled(req.body.queuesEnabled));
+});
 app.get('/api/updates', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(await updates.check());
@@ -122,12 +133,16 @@ app.get('/api/events', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
   const send = (event: unknown) => res.write(`data: ${JSON.stringify(event)}\n\n`);
-  send({ type: 'initial', chats: agents.summariesList() });
+  send({ type: 'initial', chats: agents.summariesList(), settings: agents.settings.read() });
+  const unsubscribeSettings = agents.settings.subscribe((settings) =>
+    send({ type: 'settings', settings }),
+  );
   const unsubscribe = agents.subscribeAll((chat) => send({ type: 'chat', chat }));
   const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
   req.on('close', () => {
     clearInterval(heartbeat);
     unsubscribe();
+    unsubscribeSettings();
   });
 });
 app.post('/api/chats', async (req, res) => {
@@ -353,7 +368,11 @@ app.post('/api/chats/:id/messages', (req, res) => {
     return;
   }
   if (agents.busy(record.id)) {
-    res.status(409).json({ error: 'This chat is already running. Queue the prompt instead.' });
+    res.status(409).json({
+      error: agents.settings.read().queuesEnabled
+        ? 'This chat is already running. Queue the prompt instead.'
+        : 'This chat is already running. Prompt queues are disabled; wait for the response to finish.',
+    });
     return;
   }
   // Running state is set synchronously before acknowledging the request.
@@ -367,8 +386,12 @@ app.patch('/api/chats/:id/queue', (req, res) => {
     res.status(400).json({ error: 'paused must be a boolean' });
     return;
   }
-  agents.pauseQueue(store.get(req.params.id)!, req.body.paused);
-  res.json({ ok: true });
+  try {
+    agents.pauseQueue(store.get(req.params.id)!, req.body.paused);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(409).json({ error: (error as Error).message });
+  }
 });
 app.delete('/api/chats/:id/queue/:promptId', (req, res) => {
   agents.queues.remove(req.params.id, req.params.promptId);

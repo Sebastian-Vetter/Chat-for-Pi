@@ -194,7 +194,7 @@ Terminal-only extensions, skills, prompt templates, themes, and MCP integrations
 
 ## Web commands and research subagents
 
-Type `/help` or choose **Web commands** in Search (⌘/Ctrl K) to see supported commands. The composer has no dedicated commands button.
+Type `/help` or choose **Web commands** in the command palette (⌘/Ctrl K) to see supported commands. The composer has no dedicated commands button.
 
 - `/subagent` or `/subagent on` enables AI research delegation for this conversation. Then send a normal prompt such as “Use subagents to investigate the API and frontend independently, then summarize the risks.” Pi decides when to call the research tool; enabling it alone does not make a provider request.
 - `/subagent off` disables future delegation; `/subagent status` reports the setting. The setting survives reloads.
@@ -216,7 +216,7 @@ Type `/help` or choose **Web commands** in Search (⌘/Ctrl K) to see supported 
 - Responsive dark interface and mobile sidebar
 - Workspace directory picker (enter an absolute path or `~/...`)
 - Existing Pi session browser, safe web copies, and independently running conversations
-- Sequential prompt queues with remove, pause, and resume controls
+- Sequential prompt queues with remove, pause, resume, and an installation-wide enable/disable setting (enabled by default)
 - Clickable local Git change list and unified/full-context diff viewer
 - Configured local test commands, live logs, stop controls, and run history
 - Coding activity timeline and observable Thinking & activity progress panel
@@ -238,7 +238,7 @@ Use **Browse existing Pi sessions** in the left sidebar to search saved CLI sess
 
 Start a new conversation while another runs to work in parallel; sidebar spinners and the running-session count show background activity. Each conversation has a separate Pi session and prompt queue. They share your filesystem permissions, so choose separate workspaces or Git worktrees when concurrent edits could conflict.
 
-While Pi works, enter more prompts and press **Queue** or Enter. Pending prompts run sequentially in that conversation. Remove individual items or pause/resume the queue. **Stop** pauses the queue as well as aborting the current response. Provider failures also pause it. After a backend restart, saved pending/in-flight prompts are recovered **paused** for review; retrying interrupted work may repeat changes already made before the interruption.
+With **Enable prompt queues** on (the default), enter more prompts while Pi works and press **Queue** or Enter. Pending prompts run sequentially in that conversation. Remove individual items or pause/resume the queue. **Stop** pauses the queue as well as aborting the current response. Provider failures also pause it. After a backend restart, saved pending/in-flight prompts are recovered **paused** for review; retrying interrupted work may repeat changes already made before the interruption.
 
 ## Navigation, plans, and export
 
@@ -246,7 +246,9 @@ Scrolling upward pauses automatic following and reveals **Jump to latest** above
 
 Use a conversation's **Pin** action to keep it above recent chats. **Move to folder** assigns a custom folder name; an empty name removes it. **Group sessions** switches between Recent, By project (working-directory path), and By folder. Pins and folders are stored with the chat; grouping preferences stay in this browser. Archived chats retain their organization.
 
-**Plan and queue** share one compact status row above the conversation: task completion, queued-prompt count, and a paused indicator when relevant. Both start closed, including after reload or switching chats. Click either summary to open its details in a bounded, scrollable panel over the transcript; only one is shown at a time, and opening it does not shrink the conversation. New live updates change the counts without opening the panel. Switch freely without losing an unsent task-step draft. Escape, the close icon, clicking outside, or moving keyboard focus elsewhere closes details; Escape/the close icon returns focus to the summary. Existing execution-approval proposals remain separate and visible when required.
+**Task plan bar** is hidden by default; turn on **Show task plan bar** in Settings to see it. **Prompt queues** are enabled by default. Disabling queues also hides their summary and controls. When both are hidden, the entire status row disappears. Hiding the plan does not delete its steps or disable Pi's plan tool.
+
+When visible, **plan and queue** share one compact status row above the conversation: task completion, queued-prompt count, and a paused indicator when relevant. Both start closed, including after reload or switching chats. Click either summary to open its details in a bounded, scrollable panel over the transcript; only one is shown at a time, and opening it does not shrink the conversation. New live updates change the counts without opening the panel. Switch freely without losing an unsent task-step draft. Escape, the close icon, clicking outside, or moving keyboard focus elsewhere closes details; Escape/the close icon returns focus to the summary. Existing execution-approval proposals remain separate and visible when required.
 
 **Task plan** shows explicit pending/running/done steps, not private model reasoning. Add pending steps even while Pi is working. Drag a pending step by its grip onto another pending step, or use its up/down buttons on a keyboard or phone. Only pending slots are reordered: running and completed steps stay at their exact positions. Status changes and removal still require idle work. Draft text is preserved when reordering.
 
@@ -256,7 +258,7 @@ The small **download icon** exports the visible conversation as Markdown, includ
 
 The toolbar intentionally omits Templates, Usage limits, and the Require approvals switch. Saved browser templates are no longer read or expanded; existing local storage and conversation data are not deleted. No subscription-limit checks are initiated by the interface.
 
-Press **⌘/Ctrl K** or click **Search** for the command palette. Search chats (including archived chats), projects from conversation workspaces, available models, and actions. Use arrow keys and Enter to choose; Escape closes it. Choosing a model selects it for the next submitted prompt, not an already-running response. New chat is now **⌘/Ctrl Shift N**.
+Press **⌘/Ctrl K** for the command palette; there is no visible Search button. Search chats (including archived chats), projects from conversation workspaces, available models, and actions. Use arrow keys and Enter to choose; Escape closes it. Choosing a model selects it for the next submitted prompt, not an already-running response. New chat is now **⌘/Ctrl Shift N**.
 
 ## Existing approval-protected conversations
 
@@ -278,11 +280,15 @@ The AGENTS.md section in the left sidebar uses Pi's own context discovery, inclu
 
 ## Settings and sounds
 
-Open the Settings icon or press ⌘,. Enable Finish sound, choose EV arrival / EV success / Soft chime, adjust volume, or select a custom audio file up to 1 MB. These are original synthesized sounds, **not Tesla recordings**. Audio preferences and custom files stay in browser-local storage and are never uploaded. Finish sounds cover all app conversations in the current browser tab, not just the selected chat. Keep a tab open and click Preview sound if browser autoplay rules block audio; multiple open tabs may each play a notification. Private browsing or clearing browser storage removes these preferences.
+Open the Settings icon or press ⌘,. **Enable prompt queues** defaults to on and is saved server-side for this installation, across chats, browser tabs, and restarts. Turning it off blocks new enqueues and queue resumes in the backend, hides queue controls, and pauses existing pending prompts without deleting them or stopping the current response. While off, you can draft during a run but must wait for the response to finish before sending; idle prompts send directly even if older saved prompts remain paused. Turning queues back on does not automatically execute saved work: open each queue and select **Resume queue** explicitly. Policy changes are broadcast to other tabs with revision checks so older updates cannot override newer policy.
+
+**Show task plan bar** defaults to off and is saved in this browser along with display/audio preferences. It changes visibility only and preserves the saved plan and any unsent step draft. Existing preferences without this field also default to hidden.
+
+Enable Finish sound, choose EV arrival / EV success / Soft chime, adjust volume, or select a custom audio file up to 1 MB. These are original synthesized sounds, **not Tesla recordings**. Audio preferences and custom files stay in browser-local storage and are never uploaded. Finish sounds cover all app conversations in the current browser tab, not just the selected chat. Keep a tab open and click Preview sound if browser autoplay rules block audio; multiple open tabs may each play a notification. Private browsing or clearing browser storage removes these preferences.
 
 ## Data and safety
 
-App-managed chat metadata, Pi JSONL sessions, activity, and prompt queues are saved in **`.data/`**, which is ignored by Git. They survive browser reloads and server restarts. To back up conversations, stop the app and copy `.data/`.
+App-managed chat metadata, Pi JSONL sessions, activity, prompt queues, and installation-wide queue policy (`settings.json`) are saved in **`.data/`**, which is ignored by Git. They survive browser reloads and server restarts. To back up conversations, stop the app and copy `.data/`.
 
 Deleting a chat removes its app-managed session history, not the files the agent created or changed in its workspace. Files are not automatically reverted when you delete a conversation or stop a response.
 

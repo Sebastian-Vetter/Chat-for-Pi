@@ -62,6 +62,7 @@ test('approval proposals gate real configured-test execution and reject unsafe m
 async function openConversation(page: Page, id: string) {
   await page.addInitScript((chatId) => {
     localStorage.setItem('pi-chat-active', chatId);
+    localStorage.setItem('pi-chat-settings', JSON.stringify({ showTaskPlan: true }));
     const Native = window.EventSource;
     window.EventSource = class extends Native {
       constructor(url: string | URL, options?: EventSourceInit) {

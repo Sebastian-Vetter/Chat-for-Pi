@@ -31,6 +31,7 @@ for (const width of [1280, 390]) {
       }));
       await page.addInitScript((id) => {
         localStorage.setItem('pi-chat-active', id);
+        localStorage.setItem('pi-chat-settings', JSON.stringify({ showTaskPlan: true }));
         localStorage.setItem('pi-chat-queue-collapsed', 'false');
         const Native = window.EventSource;
         window.EventSource = class extends Native {

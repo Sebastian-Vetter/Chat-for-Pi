@@ -14,7 +14,7 @@ import {
   Terminal,
   X,
 } from 'lucide-react';
-import { api, type Chat, type Config, type Snapshot } from './api';
+import { api, type Chat, type Config, type Snapshot, type QueueSettings } from './api';
 import MessageView from './MessageView';
 import WorkspaceDialog from './WorkspaceDialog';
 import Welcome from './Welcome';
@@ -58,6 +58,11 @@ export default function App() {
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [piSessionsOpen, setPiSessionsOpen] = useState(false);
   const [preferences, setPreferences] = useState(readPreferences);
+  const [queueSettings, setQueueSettings] = useState<QueueSettings>();
+  const queuesEnabled = queueSettings?.queuesEnabled ?? true;
+  function acceptQueueSettings(next: QueueSettings) {
+    setQueueSettings((current) => (current && current.revision > next.revision ? current : next));
+  }
   const [soundNotice, setSoundNotice] = useState('');
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
@@ -88,10 +93,11 @@ export default function App() {
   }
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api<Config>('/config'), api<Chat[]>('/chats')])
-      .then(([settings, list]) => {
+    Promise.all([api<Config>('/config'), api<Chat[]>('/chats'), api<QueueSettings>('/settings')])
+      .then(([settings, list, queuePolicy]) => {
         if (cancelled) return;
         setConfig(settings);
+        acceptQueueSettings(queuePolicy);
         setCwd(settings.defaultCwd);
         setChats(list);
         setActive((current) => (current && list.some((c) => c.id === current) ? current : null));
@@ -105,6 +111,8 @@ export default function App() {
     const source = new EventSource('/api/events');
     source.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      if (data.settings) acceptQueueSettings(data.settings);
+      if (data.type === 'settings') return;
       if (data.type === 'initial') {
         const states: Record<string, boolean> = {};
         data.chats.forEach((chat: { id: string; busy: boolean }) => {
@@ -221,6 +229,12 @@ export default function App() {
       return;
     }
     if (!config || loading || (!!active && !connected)) return;
+    if (!queuesEnabled && snapshot?.busy) {
+      setError(
+        'Prompt queues are disabled. Wait for the current response to finish; your draft is kept.',
+      );
+      return;
+    }
     submitting.current = true;
     setSending(true);
     setError('');
@@ -237,7 +251,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({
           text,
-          enqueue: !!snapshot?.busy || !!snapshot?.queue?.length,
+          enqueue: queuesEnabled && (!!snapshot?.busy || !!snapshot?.queue?.length),
           ...(model ? { model } : {}),
         }),
       });
@@ -472,10 +486,14 @@ export default function App() {
           chat={currentChat}
           messages={messages}
           selectedResponses={selectedResponses}
-          mac={mac}
-          openPalette={() => setPaletteOpen(true)}
         />
-        <WorkDock key={active ?? 'new'} snapshot={snapshot} onError={setError} />
+        <WorkDock
+          key={active ?? 'new'}
+          snapshot={snapshot}
+          showPlan={preferences.showTaskPlan}
+          queuesEnabled={queuesEnabled}
+          onError={setError}
+        />
         <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
         <div
           className="conversation-scroll"
@@ -583,7 +601,9 @@ export default function App() {
               aria-label="Message Pi"
               placeholder={
                 snapshot?.busy
-                  ? 'Write your next prompt — it will be queued…'
+                  ? queuesEnabled
+                    ? 'Write your next prompt — it will be queued…'
+                    : 'Pi is working — draft your next message…'
                   : 'Ask Pi anything, or describe what you want to build…'
               }
               rows={2}
@@ -616,9 +636,14 @@ export default function App() {
               </div>
               <div className="composer-right">
                 <span className="enter-hint">
-                  {snapshot?.busy ? '↵ to queue' : '↵ to send'} · ⇧ ↵ newline
+                  {snapshot?.busy
+                    ? queuesEnabled
+                      ? '↵ to queue'
+                      : 'Wait for the current reply'
+                    : '↵ to send'}{' '}
+                  · ⇧ ↵ newline
                 </span>
-                {busy && !!draft.trim() && (
+                {queuesEnabled && busy && !!draft.trim() && (
                   <button
                     type="submit"
                     className="queue-send"
@@ -681,6 +706,8 @@ export default function App() {
       {settingsOpen && (
         <SettingsDialog
           value={preferences}
+          queueSettings={queueSettings}
+          saveQueueSettings={acceptQueueSettings}
           version={appVersion}
           updates={() => {
             setSettingsOpen(false);

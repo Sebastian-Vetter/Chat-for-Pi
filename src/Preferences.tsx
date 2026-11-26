@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Music2, Play, Settings, X } from 'lucide-react';
+import { api, type QueueSettings } from './api';
 export const soundPresets = [
   { id: 'arrival', name: 'EV arrival' },
   { id: 'success', name: 'EV success' },
@@ -7,18 +8,26 @@ export const soundPresets = [
 ] as const;
 export interface Preferences {
   finishSound: boolean;
+  showTaskPlan: boolean;
   volume: number;
   preset: string;
   customSound?: string;
   soundName?: string;
 }
-const defaults: Preferences = { finishSound: true, volume: 0.3, preset: 'arrival' };
+const defaults: Preferences = {
+  finishSound: true,
+  showTaskPlan: false,
+  volume: 0.3,
+  preset: 'arrival',
+};
 export function readPreferences(): Preferences {
   try {
     const data = JSON.parse(localStorage.getItem('pi-chat-settings') ?? '{}');
     return {
       ...defaults,
       preset: soundPresets.some((p) => p.id === data.preset) ? data.preset : defaults.preset,
+      showTaskPlan:
+        typeof data.showTaskPlan === 'boolean' ? data.showTaskPlan : defaults.showTaskPlan,
       finishSound: typeof data.finishSound === 'boolean' ? data.finishSound : defaults.finishSound,
       volume:
         typeof data.volume === 'number' ? Math.max(0, Math.min(1, data.volume)) : defaults.volume,
@@ -79,12 +88,16 @@ export async function playFinishSound(preferences: Preferences) {
 }
 export default function SettingsDialog({
   value,
+  queueSettings,
+  saveQueueSettings,
   version,
   updates,
   save,
   close,
 }: {
   value: Preferences;
+  queueSettings?: QueueSettings;
+  saveQueueSettings: (settings: QueueSettings) => void;
   version?: string;
   updates: () => void;
   save: (preferences: Preferences) => void;
@@ -92,6 +105,23 @@ export default function SettingsDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState('');
+  const [savingQueue, setSavingQueue] = useState(false);
+  async function toggleQueues(enabled: boolean) {
+    setSavingQueue(true);
+    try {
+      saveQueueSettings(
+        await api<QueueSettings>('/settings', {
+          method: 'PATCH',
+          body: JSON.stringify({ queuesEnabled: enabled }),
+        }),
+      );
+      setError('');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingQueue(false);
+    }
+  }
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -101,7 +131,9 @@ export default function SettingsDialog({
       save(next);
       setError('');
     } catch {
-      setError('Your browser could not save these settings. Try a smaller sound file.');
+      setError(
+        'Your browser could not save these preferences. Check storage permissions or try a smaller sound file.',
+      );
     }
   }
   async function upload(file?: File) {
@@ -134,11 +166,44 @@ export default function SettingsDialog({
       </div>
       <h2>Make it yours</h2>
       <p>
-        Chat for Pi <strong>v{version ?? '…'}</strong> · Preferences are saved in this browser.
+        Chat for Pi <strong>v{version ?? '…'}</strong> · Display and sound preferences are saved in
+        this browser.
       </p>
       <button className="secondary-button" onClick={updates}>
         Updates & releases
       </button>
+      <div className="setting-row">
+        <div>
+          <strong>Prompt queues</strong>
+          <small>
+            Enabled by default. Applies to all chats and browser tabs on this server. Turning off
+            keeps the current response running and pauses saved prompts. Re-enable, then resume each
+            queue explicitly.
+          </small>
+        </div>
+        <input
+          type="checkbox"
+          aria-label="Enable prompt queues"
+          checked={queueSettings?.queuesEnabled ?? true}
+          disabled={!queueSettings || savingQueue}
+          onChange={(event) => void toggleQueues(event.target.checked)}
+        />
+      </div>
+      <div className="setting-row">
+        <div>
+          <strong>Task plan bar</strong>
+          <small>
+            Hidden by default. Show the task-plan summary and controls in this browser. Hiding it
+            does not delete or stop the plan.
+          </small>
+        </div>
+        <input
+          type="checkbox"
+          aria-label="Show task plan bar"
+          checked={value.showTaskPlan}
+          onChange={(event) => update({ ...value, showTaskPlan: event.target.checked })}
+        />
+      </div>
       <div className="setting-row">
         <div>
           <strong>Finish sound</strong>

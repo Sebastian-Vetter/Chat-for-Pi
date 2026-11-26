@@ -4,6 +4,21 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-26
+
+### Added
+
+- Settings now includes Enable prompt queues (on by default), enforced server-wide and persisted across restarts. Disabling blocks enqueue/resume/drain, pauses and preserves pending prompts, and lets the current response finish. Re-enabling requires an explicit per-chat resume before saved prompts run. Live policy updates synchronize browser tabs with revision checks.
+- Added Show task plan bar in browser preferences, off by default including for existing preferences. Hiding the bar preserves saved steps, the agent's plan tool, and unsent step drafts; disabling both summaries hides the entire work row.
+
+### Changed
+
+- Removed the visible Search button; the command palette remains accessible through Command/Ctrl K. With queues disabled, the composer retains drafts during active runs and sends directly while idle instead of enqueuing behind saved prompts.
+
+### Tests
+
+- Added persisted-policy, active-run, enqueue/resume gating, API validation/origin, and desktop/mobile settings regressions. Browser tests verify defaults, visibility persistence, failed saves, draft protection, direct sends, and stale cross-tab policy events without provider calls.
+
 ## [1.1.4] - 2026-11-26
 
 ### Changed

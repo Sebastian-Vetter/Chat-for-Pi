@@ -22,7 +22,8 @@ for (const width of [1280, 390]) {
     await page.goto('/');
     const actions = page.locator('.conversation-actions');
     await expect(actions).toBeVisible();
-    await expect(actions.getByRole('button')).toHaveCount(2);
+    await expect(actions.getByRole('button')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Search/ })).toHaveCount(0);
     const exportButton = actions.getByRole('button', { name: 'Export chat', exact: true });
     await expect(exportButton).toHaveText('');
     await expect(exportButton).toHaveAttribute('title', 'Export chat as Markdown');
