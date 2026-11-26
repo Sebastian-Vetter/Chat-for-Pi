@@ -14,22 +14,28 @@ import {
   Terminal,
   X,
 } from 'lucide-react';
-import { api, type Chat, type Config, type Snapshot } from './api';
+import { api, type Chat, type Config, type Snapshot, type QueueSettings } from './api';
 import MessageView from './MessageView';
 import WorkspaceDialog from './WorkspaceDialog';
 import Welcome from './Welcome';
 import SessionList, { useSessionList } from './SessionList';
+import { useConversationScroll } from './useConversationScroll';
 import InstructionFiles from './Instructions';
 import Inspector from './Inspector';
 import SettingsDialog, { readPreferences, playFinishSound, unlockSound } from './Preferences';
 import PiSessionBrowser from './PiSessions';
-import { ContextMeter, PromptQueue } from './SessionStatus';
+import { ContextMeter } from './SessionStatus';
 import ThinkingPanel from './ThinkingPanel';
 import Commands from './Commands';
 import Subagents from './Subagents';
 import Updates from './Updates';
 import './commands.css';
 import { version as appVersion } from '../package.json';
+import CommandPalette, { type PaletteAction } from './CommandPalette';
+import TaskPanel from './TaskPanel';
+import WorkDock from './WorkDock';
+import ConversationActions from './ConversationActions';
+import './productivity.css';
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -47,9 +53,16 @@ export default function App() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [selectedResponses, setSelectedResponses] = useState<number[]>([]);
   const [updatesOpen, setUpdatesOpen] = useState(false);
   const [piSessionsOpen, setPiSessionsOpen] = useState(false);
   const [preferences, setPreferences] = useState(readPreferences);
+  const [queueSettings, setQueueSettings] = useState<QueueSettings>();
+  const queuesEnabled = queueSettings?.queuesEnabled ?? true;
+  function acceptQueueSettings(next: QueueSettings) {
+    setQueueSettings((current) => (current && current.revision > next.revision ? current : next));
+  }
   const [soundNotice, setSoundNotice] = useState('');
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
@@ -62,9 +75,15 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(!!active);
-  const scroll = useRef<HTMLDivElement>(null);
+  const responseIndex =
+    snapshot?.messages.findLastIndex((message) => message.role === 'assistant') ?? -1;
+  const responseVersion =
+    responseIndex < 0 ? undefined : `${responseIndex}:${snapshot?.messages[responseIndex].text}`;
+  const { viewportRef, contentRef, scrollToLatest, paused, hasNewReply } = useConversationScroll(
+    active,
+    responseVersion,
+  );
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const follow = useRef(true);
   const submitting = useRef(false);
   const busy = !!snapshot?.busy || sending;
   async function refreshChats() {
@@ -74,10 +93,11 @@ export default function App() {
   }
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api<Config>('/config'), api<Chat[]>('/chats')])
-      .then(([settings, list]) => {
+    Promise.all([api<Config>('/config'), api<Chat[]>('/chats'), api<QueueSettings>('/settings')])
+      .then(([settings, list, queuePolicy]) => {
         if (cancelled) return;
         setConfig(settings);
+        acceptQueueSettings(queuePolicy);
         setCwd(settings.defaultCwd);
         setChats(list);
         setActive((current) => (current && list.some((c) => c.id === current) ? current : null));
@@ -91,6 +111,8 @@ export default function App() {
     const source = new EventSource('/api/events');
     source.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      if (data.settings) acceptQueueSettings(data.settings);
+      if (data.type === 'settings') return;
       if (data.type === 'initial') {
         const states: Record<string, boolean> = {};
         data.chats.forEach((chat: { id: string; busy: boolean }) => {
@@ -136,9 +158,9 @@ export default function App() {
   }, []);
   useEffect(() => {
     setSnapshot(undefined);
+    setSelectedResponses([]);
     setConnected(false);
     setLoading(!!active);
-    follow.current = true;
     if (!active) {
       localStorage.removeItem('pi-chat-active');
       return;
@@ -162,16 +184,13 @@ export default function App() {
     return () => source.close();
   }, [active]);
   useEffect(() => {
-    if (snapshot?.messages.length && follow.current && scroll.current)
-      scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [snapshot, sending]);
-  useEffect(() => {
     if (textarea.current) {
       textarea.current.style.height = 'auto';
       textarea.current.style.height = `${Math.min(textarea.current.scrollHeight, 180)}px`;
     }
   }, [draft]);
   function selectChat(id: string | null) {
+    scrollToLatest();
     drafts.current[active ?? 'new'] = draft;
     setActive(id);
     setDraft(drafts.current[id ?? 'new'] ?? '');
@@ -210,10 +229,16 @@ export default function App() {
       return;
     }
     if (!config || loading || (!!active && !connected)) return;
+    if (!queuesEnabled && snapshot?.busy) {
+      setError(
+        'Prompt queues are disabled. Wait for the current response to finish; your draft is kept.',
+      );
+      return;
+    }
     submitting.current = true;
     setSending(true);
     setError('');
-    follow.current = true;
+    scrollToLatest();
     const text = draft;
     try {
       let id = active;
@@ -226,7 +251,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({
           text,
-          enqueue: !!snapshot?.busy || !!snapshot?.queue?.length,
+          enqueue: queuesEnabled && (!!snapshot?.busy || !!snapshot?.queue?.length),
           ...(model ? { model } : {}),
         }),
       });
@@ -250,6 +275,15 @@ export default function App() {
       setError(errorText(e));
     }
   }
+  async function updateChat(chat: Chat, values: Partial<Chat>) {
+    try {
+      await api(`/chats/${chat.id}`, { method: 'PATCH', body: JSON.stringify(values) });
+      await refreshChats();
+    } catch (error) {
+      setError(errorText(error));
+    }
+  }
+
   async function archive(chat: Chat) {
     try {
       await api(`/chats/${chat.id}`, {
@@ -284,6 +318,45 @@ export default function App() {
   const latestCommand = snapshot?.events?.findLast(
     (event) => event.label.startsWith('/') && event.status === 'passed',
   );
+  const paletteActions: PaletteAction[] = [
+    { id: 'new', kind: 'Action', label: 'New chat', run: newChat },
+    {
+      id: 'workspace',
+      kind: 'Action',
+      label: 'Choose workspace',
+      run: () => setWorkspaceOpen(true),
+    },
+    { id: 'settings', kind: 'Action', label: 'Settings', run: () => setSettingsOpen(true) },
+    { id: 'tools', kind: 'Action', label: 'Workspace tools', run: () => setInspectorOpen(true) },
+    { id: 'commands', kind: 'Action', label: 'Web commands', run: () => setCommandsOpen(true) },
+    ...chats.map((chat) => ({
+      id: `chat-${chat.id}`,
+      kind: chat.archived ? 'Archived chat' : 'Chat',
+      label: chat.title,
+      detail: chat.cwd,
+      run: () => {
+        selectChat(chat.id);
+        if (window.innerWidth <= 760) setSidebar(false);
+      },
+    })),
+    ...Array.from(new Set(chats.map((chat) => chat.cwd))).map((path) => ({
+      id: `project-${path}`,
+      kind: 'Project',
+      label: path.split('/').filter(Boolean).at(-1) ?? path,
+      detail: path,
+      run: () => {
+        newChat();
+        setCwd(path);
+      },
+    })),
+    ...(config?.models ?? []).map((item) => ({
+      id: `model-${item.key}`,
+      kind: 'Model',
+      label: item.name,
+      detail: item.key,
+      run: () => setModel(item.key),
+    })),
+  ];
   return (
     <div className="app-shell">
       {sidebar && (
@@ -315,7 +388,7 @@ export default function App() {
             </div>
             <button className="new-chat" onClick={newChat}>
               <Plus size={18} />
-              New chat<span>{mac ? '⌘ K' : 'Ctrl K'}</span>
+              New chat<span>{mac ? '⌘ ⇧ N' : 'Ctrl Shift N'}</span>
             </button>
             <button className="browse-pi" onClick={() => setPiSessionsOpen(true)}>
               <Terminal size={14} />
@@ -334,6 +407,11 @@ export default function App() {
               archive={archive}
               rename={rename}
               remove={remove}
+              pin={(chat) => void updateChat(chat, { pinned: !chat.pinned })}
+              folder={(chat) => {
+                const folder = window.prompt('Folder name (empty to remove)', chat.folder ?? '');
+                if (folder !== null) void updateChat(chat, { folder });
+              }}
             />
             <InstructionFiles chatId={active} />
             <div className="sidebar-footer">
@@ -404,46 +482,77 @@ export default function App() {
           show={() => setUpdatesOpen(true)}
           close={() => setUpdatesOpen(false)}
         />
-        <PromptQueue snapshot={snapshot} onError={setError} />
+        <ConversationActions
+          chat={currentChat}
+          messages={messages}
+          selectedResponses={selectedResponses}
+        />
+        <WorkDock
+          key={active ?? 'new'}
+          snapshot={snapshot}
+          showPlan={preferences.showTaskPlan}
+          queuesEnabled={queuesEnabled}
+          onError={setError}
+        />
+        <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
         <div
           className="conversation-scroll"
-          ref={scroll}
-          onScroll={() => {
-            const el = scroll.current;
-            if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-          }}
+          ref={viewportRef}
+          role="region"
+          aria-label="Conversation"
+          tabIndex={0}
         >
-          {!messages.length && !loading && !busy ? (
-            <Welcome
-              cwd={currentChat?.cwd ?? cwd}
-              choosePrompt={(text) => {
-                setDraft(text);
-                textarea.current?.focus();
-              }}
-              openWorkspace={() => setWorkspaceOpen(true)}
-            />
-          ) : (
-            <section className="transcript" aria-label="Chat messages">
-              {loading && (
-                <div className="status-line">
-                  <LoaderCircle size={16} className="spin" />
-                  Loading conversation…
-                </div>
-              )}
-              {messages.map((message, index) => (
-                <MessageView key={index} message={message} />
-              ))}
-              <ThinkingPanel snapshot={snapshot} />
-            </section>
-          )}
-          {latestCommand && (
-            <div className="web-command-result" role="status" key={latestCommand.id}>
-              <strong>{latestCommand.label}</strong>
-              <p>{latestCommand.detail}</p>
-            </div>
-          )}
-          <Subagents snapshot={snapshot} />
+          <div className="conversation-content" ref={contentRef}>
+            {!messages.length && !loading && !busy ? (
+              <Welcome
+                cwd={currentChat?.cwd ?? cwd}
+                choosePrompt={(text) => {
+                  setDraft(text);
+                  textarea.current?.focus();
+                }}
+                openWorkspace={() => setWorkspaceOpen(true)}
+              />
+            ) : (
+              <section className="transcript" aria-label="Chat messages">
+                {loading && (
+                  <div className="status-line">
+                    <LoaderCircle size={16} className="spin" />
+                    Loading conversation…
+                  </div>
+                )}
+                {messages.map((message, index) => (
+                  <MessageView
+                    key={index}
+                    message={message}
+                    selected={selectedResponses.includes(index)}
+                    toggleSelected={() =>
+                      setSelectedResponses((current) =>
+                        current.includes(index)
+                          ? current.filter((value) => value !== index)
+                          : [...current, index],
+                      )
+                    }
+                  />
+                ))}
+                <ThinkingPanel snapshot={snapshot} />
+              </section>
+            )}
+            {latestCommand && (
+              <div className="web-command-result" role="status" key={latestCommand.id}>
+                <strong>{latestCommand.label}</strong>
+                <p>{latestCommand.detail}</p>
+              </div>
+            )}
+            <Subagents snapshot={snapshot} />
+          </div>
         </div>
+        {paused && (
+          <div className="latest-message-bar">
+            <button className="secondary-button" onClick={scrollToLatest}>
+              {hasNewReply ? 'New reply · ' : ''}Jump to latest ↓
+            </button>
+          </div>
+        )}
         <div className="composer-area">
           {(error || snapshot?.error) && (
             <div className="error-banner" role="alert">
@@ -492,7 +601,9 @@ export default function App() {
               aria-label="Message Pi"
               placeholder={
                 snapshot?.busy
-                  ? 'Write your next prompt — it will be queued…'
+                  ? queuesEnabled
+                    ? 'Write your next prompt — it will be queued…'
+                    : 'Pi is working — draft your next message…'
                   : 'Ask Pi anything, or describe what you want to build…'
               }
               rows={2}
@@ -525,9 +636,14 @@ export default function App() {
               </div>
               <div className="composer-right">
                 <span className="enter-hint">
-                  {snapshot?.busy ? '↵ to queue' : '↵ to send'} · ⇧ ↵ newline
+                  {snapshot?.busy
+                    ? queuesEnabled
+                      ? '↵ to queue'
+                      : 'Wait for the current reply'
+                    : '↵ to send'}{' '}
+                  · ⇧ ↵ newline
                 </span>
-                {busy && !!draft.trim() && (
+                {queuesEnabled && busy && !!draft.trim() && (
                   <button
                     type="submit"
                     className="queue-send"
@@ -560,9 +676,6 @@ export default function App() {
             </div>
           </form>
           <div className="composer-bottom">
-            <button type="button" className="commands-button" onClick={() => setCommandsOpen(true)}>
-              Commands /
-            </button>
             <ContextMeter snapshot={snapshot} />
             <p className="composer-disclaimer">
               Pi can edit files and run commands. Review important changes.
@@ -577,6 +690,9 @@ export default function App() {
           close={() => setInspectorOpen(false)}
         />
       )}
+      {paletteOpen && (
+        <CommandPalette actions={paletteActions} close={() => setPaletteOpen(false)} />
+      )}
       {commandsOpen && (
         <Commands
           close={() => setCommandsOpen(false)}
@@ -590,6 +706,8 @@ export default function App() {
       {settingsOpen && (
         <SettingsDialog
           value={preferences}
+          queueSettings={queueSettings}
+          saveQueueSettings={acceptQueueSettings}
           version={appVersion}
           updates={() => {
             setSettingsOpen(false);
@@ -624,13 +742,23 @@ export default function App() {
           }}
         />
       )}
-      <KeyboardShortcut action={newChat} />
+      <KeyboardShortcut action={() => setPaletteOpen(true)} newChat={newChat} />
     </div>
   );
 }
-function KeyboardShortcut({ action }: { action: () => void }) {
+function KeyboardShortcut({ action, newChat }: { action: () => void; newChat: () => void }) {
   useEffect(() => {
     function handler(event: KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'n' &&
+        !document.querySelector('dialog[open]')
+      ) {
+        event.preventDefault();
+        newChat();
+        return;
+      }
       if (
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === 'k' &&
@@ -642,6 +770,6 @@ function KeyboardShortcut({ action }: { action: () => void }) {
     }
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [action]);
+  }, [action, newChat]);
   return null;
 }

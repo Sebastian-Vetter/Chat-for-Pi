@@ -19,9 +19,10 @@ test('launchd plist escapes paths and never persists API keys or terminal sessio
   assert.ok(!plist.includes('terminal-session'));
   const managed = servicePlist(
     { ...config, dataDir: '/tmp/independent-data' },
-    { CHAT_UPDATE_CHECK: '0', GITHUB_TOKEN: 'secret-token' },
+    { CHAT_UPDATE_CHECK: '0', CHAT_USAGE_CHECK: '0', GITHUB_TOKEN: 'secret-token' },
   );
   assert.match(managed, /CHAT_UPDATE_CHECK<\/key><string>0<\/string>/);
+  assert.match(managed, /CHAT_USAGE_CHECK<\/key><string>0<\/string>/);
   assert.match(managed, /CHAT_DATA_DIR<\/key><string>\/tmp\/independent-data<\/string>/);
   assert.ok(!managed.includes('secret-token'));
 });

@@ -82,6 +82,7 @@ try {
         PORT: String(port),
         CHAT_DATA_DIR: join(temp, 'data'),
         CHAT_UPDATE_CHECK: '0',
+        CHAT_USAGE_CHECK: '0',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },

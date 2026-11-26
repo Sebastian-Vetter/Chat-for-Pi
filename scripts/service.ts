@@ -65,6 +65,7 @@ export function servicePlist(config: ServiceConfig, env: NodeJS.ProcessEnv = pro
     CHAT_WORKSPACE: config.workspace ?? dirname(config.root),
     CHAT_SERVICE_ID: config.label,
     ...(env.CHAT_UPDATE_CHECK === '0' ? { CHAT_UPDATE_CHECK: '0' } : {}),
+    ...(env.CHAT_USAGE_CHECK === '0' ? { CHAT_USAGE_CHECK: '0' } : {}),
   };
   const args = [
     config.node,

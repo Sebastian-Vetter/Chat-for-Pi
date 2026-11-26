@@ -2,6 +2,11 @@ import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from '
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+export interface PlanStep {
+  text: string;
+  status: 'pending' | 'running' | 'done';
+}
+
 export interface ChatRecord {
   id: string;
   title: string;
@@ -10,6 +15,11 @@ export interface ChatRecord {
   updatedAt: string;
   sessionFile?: string;
   archived?: boolean;
+  pinned?: boolean;
+  folder?: string;
+  approvalMode?: boolean;
+  plan?: PlanStep[];
+  planRevision?: number;
   subagentsEnabled?: boolean;
   contextUsage?: { tokens: number | null; contextWindow: number; percent: number | null };
   modelName?: string;
@@ -46,13 +56,28 @@ export class ChatStore {
     values: Partial<
       Pick<
         ChatRecord,
-        'title' | 'sessionFile' | 'contextUsage' | 'modelName' | 'subagentsEnabled' | 'archived'
+        | 'title'
+        | 'sessionFile'
+        | 'contextUsage'
+        | 'modelName'
+        | 'subagentsEnabled'
+        | 'archived'
+        | 'pinned'
+        | 'folder'
+        | 'approvalMode'
+        | 'plan'
       >
     >,
   ) {
     const record = this.get(id);
     if (!record) throw new Error('Chat not found');
-    Object.assign(record, values, { updatedAt: new Date().toISOString() });
+    const planRevision = Object.hasOwn(values, 'plan')
+      ? (record.planRevision ?? 0) + 1
+      : record.planRevision;
+    Object.assign(record, values, {
+      ...(planRevision !== undefined ? { planRevision } : {}),
+      updatedAt: new Date().toISOString(),
+    });
     this.save();
     return record;
   }

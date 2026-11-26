@@ -72,15 +72,6 @@
   margin-bottom: 0;
   opacity: 0.8;
 }
-.commands-button {
-  background: none;
-  border: 0;
-  color: var(--text-muted, #888);
-  cursor: pointer;
-  white-space: nowrap;
-  font: inherit;
-  font-size: 12px;
-}
 .command-dialog {
   max-height: 85dvh;
   overflow: auto;

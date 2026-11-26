@@ -31,7 +31,15 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export default function MessageView({ message }: { message: Message }) {
+export default function MessageView({
+  message,
+  selected,
+  toggleSelected,
+}: {
+  message: Message;
+  selected?: boolean;
+  toggleSelected?: () => void;
+}) {
   if (message.role === 'toolResult') {
     return (
       <details className={`tool-result ${message.isError ? 'failed' : ''}`}>
@@ -76,6 +84,17 @@ export default function MessageView({ message }: { message: Message }) {
       </div>
       <div className="message-actions">
         <CopyButton text={message.text} />
+        {!isUser && toggleSelected && (
+          <label className="export-selection">
+            <input
+              type="checkbox"
+              aria-label="Select response for export"
+              checked={!!selected}
+              onChange={toggleSelected}
+            />
+            Export
+          </label>
+        )}
       </div>
     </article>
   );

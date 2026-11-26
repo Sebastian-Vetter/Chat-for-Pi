@@ -1,0 +1,354 @@
+.conversation-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 8px 18px;
+  border-bottom: 1px solid #ffffff0b;
+}
+.conversation-actions .secondary-button {
+  font-size: 11px;
+  padding: 5px 9px;
+}
+.conversation-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #aab4a6;
+  cursor: pointer;
+}
+.export-chat {
+  margin-left: auto;
+}
+.conversation-export:hover:not(:disabled),
+.conversation-export:focus-visible {
+  background: #ffffff0b;
+  color: #d4dfce;
+}
+.conversation-export:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .conversation-export {
+    width: 44px;
+    height: 44px;
+  }
+}
+.export-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #aab4a6;
+}
+.export-selection input {
+  width: auto;
+}
+.latest-message-bar {
+  position: relative;
+  height: 0;
+  flex-shrink: 0;
+  z-index: 3;
+}
+.latest-message-bar button {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  box-shadow: 0 3px 18px #0007;
+  background: #293a27;
+  border-color: #b5d7a560;
+  white-space: nowrap;
+}
+.work-dock {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 6;
+}
+.work-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 12px 5px;
+}
+.work-summary button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #8e9d87;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.work-summary button:hover,
+.work-summary button[aria-expanded='true'] {
+  background: #ffffff08;
+  color: #c5daba;
+}
+.work-count {
+  color: #aab4a6;
+  font-variant-numeric: tabular-nums;
+}
+.work-paused {
+  font-size: 9px;
+  color: #a99b7c;
+}
+.work-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 12px;
+  width: min(720px, calc(100% - 24px));
+  max-height: min(460px, 55dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  border: 1px solid #b5d7a52b;
+  border-radius: 10px;
+  background: #1b211d;
+  box-shadow: 0 12px 32px #0005;
+}
+.work-close {
+  position: sticky;
+  top: 6px;
+  float: right;
+  margin: 6px 6px 0 0;
+  z-index: 1;
+  background: #1b211d;
+}
+.work-popover .task-plan {
+  margin: 0;
+  border: 0;
+}
+@media (pointer: coarse) {
+  .work-summary button,
+  .work-close {
+    min-height: 44px;
+  }
+  .work-close {
+    min-width: 44px;
+  }
+}
+.task-panel {
+  flex-shrink: 0;
+  max-height: 32vh;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.task-plan,
+.approval-request {
+  margin: 8px 18px;
+  padding: 10px 12px;
+  border: 1px solid #b5d7a52b;
+  border-radius: 9px;
+  font-size: 12px;
+}
+.task-plan h3 {
+  margin: 0 28px 8px 0;
+  font-size: 12px;
+  color: #c5daba;
+}
+.task-plan p,
+.approval-request p {
+  color: #899684;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.task-plan ol {
+  padding: 0;
+  list-style: none;
+}
+.task-plan li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 0;
+}
+.task-plan .plan-step-text {
+  flex: 1;
+  min-width: 100px;
+  overflow-wrap: anywhere;
+}
+.plan-move-controls {
+  display: flex;
+  gap: 4px;
+}
+.task-plan .plan-drag-handle {
+  cursor: grab;
+}
+.task-plan .plan-drag-handle:active {
+  cursor: grabbing;
+}
+.task-plan .plan-drag-handle,
+.plan-move-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+}
+.task-plan .plan-drop-target {
+  outline: 2px dashed #b5d7a5;
+  outline-offset: 3px;
+  background: #b5d7a510;
+}
+.plan-edit-notice {
+  font-size: 11px;
+  color: #aabf9f;
+  line-height: 1.5;
+}
+.plan-edit-notice:not(:empty) {
+  margin-top: 8px;
+}
+.plan-status {
+  font-size: 10px;
+  color: #aab4a6;
+}
+.plan-status.done {
+  color: #b5d7a5;
+}
+.plan-status.running {
+  color: #eed49f;
+}
+.task-plan .secondary-button {
+  padding: 4px 7px;
+  font-size: 10px;
+}
+.task-plan form {
+  display: flex;
+  gap: 8px;
+}
+.task-plan input {
+  flex: 1;
+  min-width: 0;
+}
+.approval-request {
+  border-color: #eed49f66;
+}
+.approval-request h3 {
+  margin: 0;
+  color: #eed49f;
+}
+.approval-request pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+  background: #0003;
+  padding: 10px;
+}
+.productivity-dialog {
+  width: min(680px, calc(100vw - 28px));
+  max-height: 85dvh;
+  overflow: auto;
+}
+.productivity-dialog input,
+.task-plan input,
+.session-grouping select {
+  background: #151b15;
+  border: 1px solid #b5d7a52b;
+  border-radius: 6px;
+  color: #d6dfd2;
+  font: inherit;
+  padding: 8px;
+}
+.productivity-dialog > input {
+  width: 100%;
+}
+.palette-results {
+  max-height: 46vh;
+  overflow: auto;
+  margin: 12px 0;
+}
+.palette-results button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  gap: 4px;
+}
+.palette-results button[aria-selected='true'],
+.palette-results button:hover {
+  background: #b5d7a51a;
+}
+.palette-results small {
+  color: #90ae82;
+  font-size: 10px;
+}
+.palette-results span {
+  color: #85917e;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.session-grouping {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 7px;
+  font-size: 10px;
+  color: #82907c;
+}
+.session-grouping select {
+  font-size: 10px;
+  padding: 4px;
+}
+.chat-list .chat-item {
+  flex-wrap: wrap;
+}
+.chat-list .chat-item-actions {
+  position: static;
+  width: 100%;
+  justify-content: flex-end;
+  background: none;
+  margin: 0 3px 4px;
+}
+.session-group-heading {
+  margin: 16px 8px 6px;
+  font-size: 10px;
+  color: #94ac88;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversation-scroll:focus-visible {
+  outline: 1px solid #b5d7a566;
+  outline-offset: -2px;
+}
+@media (max-width: 760px) {
+  .task-plan .plan-drag-handle,
+  .plan-move-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .conversation-actions {
+    padding: 7px 10px;
+    gap: 6px;
+  }
+  .task-plan,
+  .approval-request {
+    margin: 6px 10px;
+  }
+  .task-panel {
+    max-height: 28dvh;
+  }
+}

@@ -4,6 +4,93 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-26
+
+### Added
+
+- Settings now includes Enable prompt queues (on by default), enforced server-wide and persisted across restarts. Disabling blocks enqueue/resume/drain, pauses and preserves pending prompts, and lets the current response finish. Re-enabling requires an explicit per-chat resume before saved prompts run. Live policy updates synchronize browser tabs with revision checks.
+- Added Show task plan bar in browser preferences, off by default including for existing preferences. Hiding the bar preserves saved steps, the agent's plan tool, and unsent step drafts; disabling both summaries hides the entire work row.
+
+### Changed
+
+- Removed the visible Search button; the command palette remains accessible through Command/Ctrl K. With queues disabled, the composer retains drafts during active runs and sends directly while idle instead of enqueuing behind saved prompts.
+
+### Tests
+
+- Added persisted-policy, active-run, enqueue/resume gating, API validation/origin, and desktop/mobile settings regressions. Browser tests verify defaults, visibility persistence, failed saves, draft protection, direct sends, and stale cross-tab policy events without provider calls.
+
+## [1.1.4] - 2026-11-26
+
+### Changed
+
+- Removed the Commands / button below the composer for a quieter interface. The command reference remains accessible through `/help` and the searchable command palette; command behavior is unchanged.
+
+### Tests
+
+- Verified the removed button stays absent and that the command reference opens from the keyboard-driven palette and `/help`.
+
+## [1.1.3] - 2026-11-26
+
+### Changed
+
+- Replaced competing task-plan and prompt-queue blocks with one quiet status row showing plan progress, queue count, and paused state. Details start closed and open only on request in a shared, scrollable overlay: one view at a time without shrinking the transcript or composer. Live updates never auto-open it.
+- Switching views preserves unsent task-step drafts. Escape, the close icon, outside clicks, and moving focus elsewhere dismiss details; explicit dismissal restores summary-button focus. Plan editing, queue execution/controls, and existing approval gates remain unchanged.
+
+### Tests
+
+- Desktop/mobile regressions cover long plans and queues together, unchanged transcript bounds, bounded internal scrolling, draft preservation, live updates, keyboard/modal interactions, dismissal, reload defaults, and short mobile viewports. Existing reordering and approval tests exercise the new panel without provider calls.
+
+## [1.1.2] - 2026-11-26
+
+### Changed
+
+- Simplified the conversation toolbar: removed Templates, Usage limits, and Require approvals controls, along with template/usage command-palette entries and dialogs. Template shortcuts are no longer expanded, and the interface makes no subscription-limit requests. Existing browser storage and conversation data are preserved.
+- Chat and selected-response exports use small, subdued icons at the edge of the toolbar, without visible button text. Tooltips, accessible labels, keyboard activation, and touch-sized hit targets remain available.
+- Existing approval-enabled conversations retain their backend protections and pending approval proposals; removing the switch does not silently authorize gated execution.
+
+### Tests
+
+- Updated desktop/mobile interface and palette regressions for removed controls and legacy templates, verified no usage checks, and retained real approval-gating and Markdown download coverage, including keyboard activation of icon-only exports.
+
+## [1.1.1] - 2026-11-26
+
+### Added
+
+- Drag-and-drop grips and accessible up/down buttons reorder pending task-plan steps, including while Pi or configured tests are active. Running and completed steps keep their exact positions. Pending steps can also be added during active work; status changes/removal remain idle-only, and the plan does not start or enqueue prompts.
+- Persisted plan revisions protect browser edits and model updates from overwriting newer changes. Stale operations fail with a review/retry message, live changes cancel an in-progress drag, and Pi must reread the current revision before replacing an existing plan. Reordering preserves unsent step text and keyboard focus.
+
+### Tests
+
+- Added plan operation, revision persistence, and stale-model-update tests plus API validation/origin checks. Desktop/mobile browser tests cover real pending work, native dragging, keyboard/button movement, fixed running/done positions, draft preservation, reloads, concurrent tabs, and mid-drag updates without provider calls.
+
+## [1.1.0] - 2026-11-26
+
+### Added
+
+- A jump-to-latest button with a new-reply hint while reading older messages; clicking it resumes automatic following without interrupting manual scrolling.
+- Persistent pinned conversations, custom folders, and browser-persisted grouping by recency, workspace project, or folder. Sidebar actions no longer cover conversation titles.
+- Public pending/running/done task checklists, editable while idle and readable/updatable by Pi through an explicit `update_plan` tool. No private reasoning channels are used.
+- Markdown downloads for complete visible conversations or selected assistant responses, with safely fenced tool output and no hidden-thinking export.
+- Editable browser-local prompt templates, built-in review/debug/test shortcuts, and a searchable keyboard-accessible command palette for chats, projects, models, templates, and actions. Cmd/Ctrl K opens the palette; Cmd/Ctrl Shift N starts a new chat.
+- Opt-in per-conversation execution approvals that gate the actual write/edit/bash/PowerShell implementations and configured-test process spawning. Full proposals require a one-shot, chat-scoped decision; cancellation, expiry, shutdown, audit failures, and replayed decisions fail closed. Denied agent actions pause the prompt queue. This remains trusted local execution, not a sandbox or rollback system.
+- Explicit subscription-usage checks for OpenAI Codex/ChatGPT and Anthropic/Claude OAuth accounts: provider-reported 5-hour/weekly percentages and reset times, with honest unavailable/unsupported states. Checks use fixed endpoints, server-only credentials, bounded responses, deadlines, coalescing, a one-minute cache, and a `CHAT_USAGE_CHECK=0` opt-out. No inference prompts are sent.
+
+### Tests
+
+- Added approval tests covering real SDK overrides, writes/edits, denied shells, configured tests, cancellation, timeouts, audit failures, cross-chat decisions, replay protection, and persistent plans. Added quota metadata/parser/privacy tests and Markdown/template regression tests.
+- Added desktop/mobile workflow, download, quota, command-palette, and jump-button coverage without live-provider calls. Browser tests disable real usage checks and use unique chat fixtures.
+
+## [1.0.7] - 2026-11-26
+
+### Fixed
+
+- Conversations now open at the latest content and keep following streamed replies, activity-only runs, delayed image/font layout changes, and viewport resizing. Layout-generated scroll events no longer accidentally disable automatic following.
+- Scrolling upward with the wheel, touch, keyboard, or scrollbar pauses automatic following so older messages remain readable. Returning to the bottom resumes following; opening another conversation or sending a message returns to the latest content.
+
+### Tests
+
+- Added desktop/mobile browser regression coverage for initial opening, reloads, conversation switching, streaming, delayed images, resizing, upward-scroll intent, and resuming automatic following. Tests use simulated conversation events without live-provider calls.
+
 ## [1.0.6] - 2026-11-25
 
 ### Changed
