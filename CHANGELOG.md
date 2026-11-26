@@ -4,6 +4,16 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-26
+
+### Fixed
+
+- Prevent duplicate task-plan and prompt-queue bars after switching between shared and private conversations. WorkDock and the approval panel now use distinct React sibling keys, so old work controls are removed reliably on conversation changes.
+
+### Tests
+
+- Added desktop/mobile regressions that repeatedly switch between shared and private sessions, verify exactly one work bar/details panel with the selected conversation's plan and queue, and reject duplicate-key console warnings. Queues remain paused throughout; no provider calls.
+
 ## [1.2.0] - 2026-11-26
 
 ### Added

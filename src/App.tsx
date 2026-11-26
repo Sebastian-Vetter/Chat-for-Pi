@@ -619,13 +619,17 @@ export default function App() {
               selectedResponses={selectedResponses}
             />
             <WorkDock
-              key={active ?? 'new'}
+              key={`work-dock:${active ?? 'new'}`}
               snapshot={snapshot}
               showPlan={preferences.showTaskPlan}
               queuesEnabled={queuesEnabled}
               onError={setError}
             />
-            <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
+            <TaskPanel
+              key={`task-panel:${active ?? 'new'}`}
+              snapshot={snapshot}
+              onError={setError}
+            />
             <div
               className="conversation-scroll"
               ref={viewportRef}
