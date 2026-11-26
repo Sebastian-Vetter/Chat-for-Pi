@@ -536,20 +536,22 @@ export default function App() {
       <main className="main-panel">
         {remote ? (
           <>
-            {!sidebar && (
-              <button
-                className="icon-button shared-mobile-menu"
-                aria-label="Open sidebar"
-                onClick={() => setSidebar(true)}
-              >
-                <Menu size={20} />
-              </button>
-            )}
             <RemoteSharedView
               key={remote}
               id={remote}
               changed={refreshShared}
               roleChanged={setRemoteRole}
+              sidebarControl={
+                !sidebar && (
+                  <button
+                    className="icon-button"
+                    aria-label="Open sidebar"
+                    onClick={() => setSidebar(true)}
+                  >
+                    <Menu size={20} />
+                  </button>
+                )
+              }
               networkControl={
                 <NetworkRing
                   identity={sharing.listing.owner}
@@ -561,7 +563,7 @@ export default function App() {
           </>
         ) : (
           <>
-            <header className="topbar">
+            <header className={`topbar ${currentChat?.shared ? 'shared-session-topbar' : ''}`}>
               <div className="topbar-left">
                 {!sidebar && (
                   <button

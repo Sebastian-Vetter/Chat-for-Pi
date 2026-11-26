@@ -4,6 +4,17 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-26
+
+### Fixed
+
+- Shared participant conversations now reuse the private chat's padded, centered transcript and bounded composer instead of rendering messages directly against the panel edge. Reader notices, owner metadata and connection errors also keep consistent gutters.
+- Unified the writer composer with the normal chat styling and icon send control, with bounded auto-growing drafts. Integrated the mobile sidebar button into the shared header, kept roles visible on narrow screens, and contained long titles, owner names and code blocks without horizontal page overflow.
+
+### Tests
+
+- Added reader/writer desktop/mobile layout regressions with long titles, owner names, code lines, multiline drafts, short viewports and offline errors. Verified message/footer gutters, maximum widths, header alignment, transcript/composer separation and screenshots without provider calls.
+
 ## [1.2.2] - 2026-11-26
 
 ### Changed
