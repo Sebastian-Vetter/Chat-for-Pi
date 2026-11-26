@@ -613,11 +613,6 @@ export default function App() {
               show={() => setUpdatesOpen(true)}
               close={() => setUpdatesOpen(false)}
             />
-            <ConversationActions
-              chat={currentChat}
-              messages={messages}
-              selectedResponses={selectedResponses}
-            />
             <WorkDock
               key={`work-dock:${active ?? 'new'}`}
               snapshot={snapshot}
@@ -817,6 +812,11 @@ export default function App() {
                 </p>
               </div>
             </div>
+            <ConversationActions
+              chat={currentChat}
+              messages={messages}
+              selectedResponses={selectedResponses}
+            />
           </>
         )}
       </main>

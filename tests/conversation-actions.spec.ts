@@ -28,6 +28,26 @@ for (const width of [1280, 390]) {
     await expect(exportButton).toHaveText('');
     await expect(exportButton).toHaveAttribute('title', 'Export chat as Markdown');
     await expect(exportButton).toBeDisabled();
+    for (const height of [900, 560]) {
+      await page.setViewportSize({ width, height });
+      await expect
+        .poll(async () => {
+          const button = await exportButton.boundingBox();
+          const panel = await page.locator('.main-panel').boundingBox();
+          const composer = await page.locator('.composer-area').boundingBox();
+          if (!button || !panel || !composer) return false;
+          const right = panel.x + panel.width - button.x - button.width;
+          const bottom = panel.y + panel.height - button.y - button.height;
+          return (
+            right >= 0 &&
+            right <= 10 &&
+            bottom >= 0 &&
+            bottom <= 6 &&
+            button.y >= composer.y + composer.height - 1
+          );
+        })
+        .toBe(true);
+    }
     await expect(page.getByRole('checkbox', { name: 'Require action approvals' })).toHaveCount(0);
     await page.keyboard.press('Control+k');
     const palette = page.getByRole('dialog', { name: 'Command palette', exact: true });

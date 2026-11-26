@@ -4,6 +4,16 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-26
+
+### Changed
+
+- Moved the icon-only conversation export controls from the top toolbar to the bottom-right edge of the conversation, after the composer. The compact footer stays clear of message input and respects safe-area insets; selected-response export remains alongside whole-chat export.
+
+### Tests
+
+- Desktop/mobile layout coverage verifies export controls remain at the bottom-right edge without overlapping the composer at normal and short viewport heights. Existing Markdown download and keyboard tests continue to cover full and selected exports.
+
 ## [1.2.1] - 2026-11-26
 
 ### Fixed
