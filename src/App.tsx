@@ -57,6 +57,13 @@ export default function App() {
   const [active, setActive] = useState<string | null>(() => localStorage.getItem('pi-chat-active'));
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const sharing = useShared();
+  const accessRequests = sharing.listing.owned.flatMap((share) =>
+    (share.requests ?? []).map((request) => ({
+      ...request,
+      sessionId: share.id,
+      sessionTitle: share.title,
+    })),
+  );
   const [sidebarTab, setSidebarTab] = useState<'chats' | 'shared'>('chats');
   const [remote, setRemote] = useState<string | null>(null);
   const [remoteRole, setRemoteRole] = useState<'reader' | 'writer'>();
@@ -563,6 +570,7 @@ export default function App() {
               networkControl={
                 <NetworkRing
                   identity={sharing.listing.owner}
+                  requests={accessRequests}
                   changed={refreshShared}
                   joined={selectRemote}
                 />
@@ -605,6 +613,7 @@ export default function App() {
               </button>
               <NetworkRing
                 identity={sharing.listing.owner}
+                requests={accessRequests}
                 changed={refreshShared}
                 joined={selectRemote}
               />

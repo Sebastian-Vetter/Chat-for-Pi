@@ -19,9 +19,42 @@
   background: #ffffff08;
 }
 .network-ring {
+  position: relative;
   margin-left: auto;
   flex-shrink: 0;
   color: #99a891;
+}
+.network-request-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  padding: 1px 3px;
+  border-radius: 8px;
+  background: #33432e;
+  color: #d4dfce;
+  font-size: 9px;
+}
+.shared-access-request,
+.shared-outgoing-requests > div {
+  padding: 12px 0;
+  border-top: 1px solid #ffffff0b;
+  overflow-wrap: anywhere;
+}
+.shared-access-request > span,
+.shared-outgoing-requests small {
+  display: block;
+  color: #8e9d87;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.network-peers > div > span {
+  flex: 1;
+}
+.network-peers .secondary-button {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 6px 8px;
 }
 .shared-dialog {
   width: min(620px, calc(100vw - 28px));

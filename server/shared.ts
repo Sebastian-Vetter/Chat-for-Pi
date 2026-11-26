@@ -13,6 +13,13 @@ interface Member extends PeerIdentity {
   tokenHash: string;
   grantId: string;
   blocked?: boolean;
+  admitted?: boolean;
+}
+interface AccessRequest {
+  id: string;
+  peer: PeerIdentity;
+  createdAt: string;
+  state: 'pending' | 'denied';
 }
 interface Share {
   id: string;
@@ -20,15 +27,19 @@ interface Share {
   enabled: boolean;
   invites: Partial<Record<SharedRole, string>>;
   members: Member[];
+  requests?: AccessRequest[];
 }
-export interface SharedInvite {
-  version: 1;
+export const ACCESS_MARKER = 'pi-chat-access-v1'.padEnd(43, '_');
+export interface SharedTarget {
   endpoint: string;
   certificate: string;
   sessionId: string;
-  token: string;
   ownerId: string;
   owner: PeerIdentity;
+}
+export interface SharedInvite extends SharedTarget {
+  version: 1;
+  token: string;
   ownerProof: string;
 }
 export function invitationMessage(invite: Omit<SharedInvite, 'ownerProof'>) {
@@ -46,7 +57,7 @@ export function invitationMessage(invite: Omit<SharedInvite, 'ownerProof'>) {
 }
 export interface RemoteShare {
   id: string;
-  invite: Omit<SharedInvite, 'token'>;
+  invite: SharedTarget;
   token: string;
   title: string;
 }
@@ -144,6 +155,7 @@ export class SharedService {
                 title: chat.title,
                 enabled: share.enabled,
                 role: 'owner' as const,
+                requests: (share.requests ?? []).filter((request) => request.state === 'pending'),
                 members: share.members.map(
                   ({ tokenHash: _secret, grantId: _grant, ...member }) => member,
                 ),
@@ -171,9 +183,11 @@ export class SharedService {
     share.enabled = enabled;
     if (!enabled) {
       this.typing.clear(id);
+      share.requests = [];
       share.invites = {};
       share.members.forEach((member) => {
         member.tokenHash = '';
+        member.admitted = false;
         member.grantId = randomUUID();
       });
     }
@@ -201,6 +215,10 @@ export class SharedService {
       member.role = role;
       member.blocked = false;
     }
+    member.admitted = role !== 'removed';
+    this.share(id).requests = (this.share(id).requests ?? []).filter(
+      (request) => request.peer.id !== memberId,
+    );
     this.typing.clear(id, memberId);
     member.grantId = randomUUID();
     this.share(id).invites = {};
@@ -257,20 +275,20 @@ export class SharedService {
     if (!remote) throw new Error('Joined session not found');
     return remote;
   }
-  assertKnownOwner(invite: SharedInvite) {
+  assertKnownOwner(invite: SharedTarget) {
     const known = this.state.remotes.find((item) => item.invite.ownerId === invite.ownerId);
     if (known && known.invite.owner?.publicKey !== invite.owner.publicKey)
       throw new Error(
         'Owner identity key changed. Verify with the owner and remove the old joined session before pairing again.',
       );
   }
-  addRemote(invite: SharedInvite, token: string, title: string) {
+  addRemote(invite: SharedTarget, token: string, title: string) {
     this.assertKnownOwner(invite);
     let remote = this.state.remotes.find(
       (item) =>
         item.invite.ownerId === invite.ownerId && item.invite.sessionId === invite.sessionId,
     );
-    const { token: _invitationSecret, ...target } = invite;
+    const { token: _invitationSecret, ...target } = invite as SharedTarget & { token?: string };
     if (remote) Object.assign(remote, { invite: target, token, title });
     else {
       remote = { id: randomUUID(), invite: target, token, title };
@@ -311,7 +329,95 @@ export class SharedService {
     });
     return { payload, signature: this.identity.sign(payload) };
   }
-  rpc(envelope: SignedRequest, token: string): unknown {
+  decideAccess(id: string, requestId: string, role: unknown) {
+    const share = this.share(id);
+    if (!share.enabled) throw new Error('Sharing is off');
+    if (role !== null && role !== 'reader' && role !== 'writer')
+      throw new Error('Choose reader, writer or rejection');
+    const request = share.requests?.find(
+      (request) => request.id === requestId && request.state === 'pending',
+    );
+    if (!request) throw new Error('Request is no longer pending');
+    if (role === null) request.state = 'denied';
+    else {
+      let member = share.members.find((member) => member.id === request.peer.id);
+      if (member && member.publicKey !== request.peer.publicKey)
+        throw new Error('Participant identity changed');
+      if (!member && share.members.length >= 50) throw new Error('Participant limit reached');
+      const grant: Member = {
+        ...request.peer,
+        role,
+        tokenHash: '',
+        grantId: randomUUID(),
+        admitted: true,
+        blocked: false,
+      };
+      if (member) Object.assign(member, grant);
+      else {
+        member = grant;
+        share.members.push(member);
+      }
+      share.requests = share.requests!.filter((item) => item.id !== requestId);
+      this.typing.clear(id, member.id);
+    }
+    this.save();
+    return this.list();
+  }
+  accessRPC(envelope: SignedRequest): unknown {
+    const { request, nonceKey } = this.verify(envelope, ACCESS_MARKER);
+    if (!['access-request', 'access-status'].includes(request.operation))
+      throw new Error('Unsupported access operation');
+    const share = this.share(request.sessionId);
+    if (!share.enabled || request.peer.id === this.identity.public().id)
+      throw new Error('Sharing is off or invalid participant');
+    const member = share.members.find((member) => member.id === request.peer.id);
+    if (member && member.publicKey !== request.peer.publicKey)
+      throw new Error('Participant identity changed');
+    if (member?.blocked) return { state: 'denied' };
+    if (member && member.admitted !== false && (member.admitted || member.tokenHash)) {
+      this.nonces.set(nonceKey, Date.now() + 120000);
+      const token = secret();
+      member.tokenHash = digest(token);
+      member.admitted = true;
+      member.name = request.peer.name;
+      this.save();
+      return {
+        state: 'approved',
+        token,
+        title: this.store.get(share.id)!.title,
+        ownerId: this.identity.public().id,
+        owner: this.identity.public(),
+      };
+    }
+    const requests = share.requests ?? [];
+    let pending = requests.find(
+      (item) => item.peer.id === request.peer.id || item.peer.publicKey === request.peer.publicKey,
+    );
+    if (
+      pending &&
+      (pending.peer.id !== request.peer.id || pending.peer.publicKey !== request.peer.publicKey)
+    )
+      throw new Error('Request identity changed');
+    if (!pending && request.operation === 'access-request') {
+      if (
+        requests.length >= 100 ||
+        requests.filter((item) => item.state === 'pending').length >= 25
+      )
+        throw new Error('Access request limit reached');
+      pending = {
+        id: randomUUID(),
+        peer: request.peer,
+        createdAt: new Date().toISOString(),
+        state: 'pending',
+      };
+      requests.push(pending);
+      share.requests = requests;
+      this.save();
+    }
+    if (pending) this.nonces.set(nonceKey, Date.now() + 120000);
+    return { state: pending?.state ?? 'expired' };
+  }
+  private verify(envelope: SignedRequest, token: string) {
     if (
       !envelope ||
       typeof envelope.payload !== 'string' ||
@@ -339,6 +445,10 @@ export class SharedService {
     const nonceKey = `${request.peer.id}:${request.nonce}`;
     if (this.nonces.has(nonceKey) || this.nonces.size >= 10000)
       throw new Error('Replayed request or request limit reached');
+    return { request, nonceKey };
+  }
+  rpc(envelope: SignedRequest, token: string): unknown {
+    const { request, nonceKey } = this.verify(envelope, token);
     const share = this.share(request.sessionId);
     if (!share.enabled || request.peer.id === this.identity.public().id)
       throw new Error('Sharing is off or invalid participant');
@@ -364,6 +474,8 @@ export class SharedService {
         member = { ...request.peer, role, tokenHash: digest(accessToken), grantId: randomUUID() };
         share.members.push(member);
       }
+      member.admitted = true;
+      share.requests = (share.requests ?? []).filter((request) => request.peer.id !== member!.id);
       this.typing.clear(share.id, member.id);
       this.save();
       return {
