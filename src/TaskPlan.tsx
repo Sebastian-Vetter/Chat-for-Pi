@@ -12,12 +12,13 @@ export default function TaskPlan({
   chat,
   busy,
   onError,
+  onChange,
 }: {
   chat: Chat;
   busy: boolean;
   onError: (message: string) => void;
+  onChange: (chat: Chat) => void;
 }) {
-  const [confirmed, setConfirmed] = useState<Chat>();
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
   const [dragged, setDragged] = useState<DraggedStep>();
@@ -28,10 +29,8 @@ export default function TaskPlan({
   const restoreFocus = useRef<{ index: number; revision: number; control: string } | undefined>(
     undefined,
   );
-  const current =
-    confirmed && (confirmed.planRevision ?? 0) > (chat.planRevision ?? 0) ? confirmed : chat;
-  const revision = current.planRevision ?? 0;
-  const plan = current.plan ?? [];
+  const revision = chat.planRevision ?? 0;
+  const plan = chat.plan ?? [];
   const pending = plan.flatMap((step, index) => (step.status === 'pending' ? [index] : []));
   const occurrences = new Map<string, number>();
 
@@ -56,12 +55,6 @@ export default function TaskPlan({
     button?.scrollIntoView({ block: 'nearest' });
   }, [revision, saving]);
 
-  function accept(next: Chat) {
-    setConfirmed((previous) =>
-      previous && (previous.planRevision ?? 0) > (next.planRevision ?? 0) ? previous : next,
-    );
-  }
-
   async function edit(operation: PlanEdit, focusControl?: string) {
     if (submitting.current) return;
     submitting.current = true;
@@ -81,7 +74,7 @@ export default function TaskPlan({
           revision: next.planRevision ?? 0,
           control: focusControl,
         };
-      accept(next);
+      onChange(next);
       if (operation.action === 'add') setText((value) => (value === submittedText ? '' : value));
       setNotice(
         operation.action === 'move'
@@ -92,7 +85,7 @@ export default function TaskPlan({
       onError(error instanceof Error ? error.message : String(error));
       // Never retry a stale mutation automatically: refresh, then let the reader decide.
       try {
-        accept((await api<Snapshot>(`/chats/${chat.id}`)).chat);
+        onChange((await api<Snapshot>(`/chats/${chat.id}`)).chat);
       } catch {
         /* The connection may also be unavailable. */
       }
@@ -103,15 +96,11 @@ export default function TaskPlan({
   }
 
   return (
-    <details className="task-plan" aria-busy={saving} open={plan.length > 0 ? true : undefined}>
-      <summary>
+    <section className="task-plan" aria-label="Task plan" aria-busy={saving}>
+      <h3>
         Task plan · {plan.filter((step) => step.status === 'done').length}/{plan.length} done
-      </summary>
-      <p>
-        Observable steps and outcomes only — not private model reasoning. Add steps or reorder
-        pending steps even while Pi works. Running and completed steps stay in place. This checklist
-        does not start or queue prompts.
-      </p>
+      </h3>
+      <p>Reorder pending steps or add a step. This checklist does not send prompts.</p>
       <ol ref={list} aria-label="Task plan steps">
         {plan.map((step, index) => {
           const identity = JSON.stringify([step.status, step.text]);
@@ -279,6 +268,6 @@ export default function TaskPlan({
       <div className="plan-edit-notice" role="status" aria-live="polite">
         {notice}
       </div>
-    </details>
+    </section>
   );
 }

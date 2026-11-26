@@ -4,6 +4,17 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-26
+
+### Changed
+
+- Replaced competing task-plan and prompt-queue blocks with one quiet status row showing plan progress, queue count, and paused state. Details start closed and open only on request in a shared, scrollable overlay: one view at a time without shrinking the transcript or composer. Live updates never auto-open it.
+- Switching views preserves unsent task-step drafts. Escape, the close icon, outside clicks, and moving focus elsewhere dismiss details; explicit dismissal restores summary-button focus. Plan editing, queue execution/controls, and existing approval gates remain unchanged.
+
+### Tests
+
+- Desktop/mobile regressions cover long plans and queues together, unchanged transcript bounds, bounded internal scrolling, draft preservation, live updates, keyboard/modal interactions, dismissal, reload defaults, and short mobile viewports. Existing reordering and approval tests exercise the new panel without provider calls.
+
 ## [1.1.2] - 2026-11-26
 
 ### Changed

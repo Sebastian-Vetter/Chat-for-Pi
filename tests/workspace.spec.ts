@@ -63,6 +63,7 @@ test('workspace: instructions, clickable diff, local tests, activity and paused 
     await page.getByRole('textbox', { name: 'Message Pi' }).fill('Second queued task');
     await page.getByRole('button', { name: 'Send message', exact: true }).click();
     await expect(page.getByText('2 queued', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Show prompt queue', exact: true }).click();
     await page.getByRole('button', { name: 'Remove queued prompt First queued task' }).click();
     await expect(page.getByText('1 queued', { exact: true })).toBeVisible();
     expect(errors).toEqual([]);

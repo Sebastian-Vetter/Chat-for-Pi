@@ -24,7 +24,7 @@ import InstructionFiles from './Instructions';
 import Inspector from './Inspector';
 import SettingsDialog, { readPreferences, playFinishSound, unlockSound } from './Preferences';
 import PiSessionBrowser from './PiSessions';
-import { ContextMeter, PromptQueue } from './SessionStatus';
+import { ContextMeter } from './SessionStatus';
 import ThinkingPanel from './ThinkingPanel';
 import Commands from './Commands';
 import Subagents from './Subagents';
@@ -33,6 +33,7 @@ import './commands.css';
 import { version as appVersion } from '../package.json';
 import CommandPalette, { type PaletteAction } from './CommandPalette';
 import TaskPanel from './TaskPanel';
+import WorkDock from './WorkDock';
 import ConversationActions from './ConversationActions';
 import './productivity.css';
 
@@ -474,7 +475,7 @@ export default function App() {
           mac={mac}
           openPalette={() => setPaletteOpen(true)}
         />
-        <PromptQueue snapshot={snapshot} onError={setError} />
+        <WorkDock key={active ?? 'new'} snapshot={snapshot} onError={setError} />
         <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
         <div
           className="conversation-scroll"

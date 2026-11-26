@@ -1,5 +1,4 @@
-import { useId, useState } from 'react';
-import { ChevronDown, ListOrdered, Pause, Play, X } from 'lucide-react';
+import { Pause, Play, X } from 'lucide-react';
 import { api, type Snapshot } from './api';
 export function ContextMeter({ snapshot }: { snapshot?: Snapshot }) {
   const context = snapshot?.contextUsage;
@@ -49,79 +48,52 @@ export function PromptQueue({
   snapshot?: Snapshot;
   onError: (error: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem('pi-chat-queue-collapsed') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const bodyId = useId();
-  if (!snapshot?.queue?.length) return null;
-  const base = `/chats/${snapshot.chat.id}/queue`;
-  function toggle() {
-    const next = !collapsed;
-    setCollapsed(next);
-    try {
-      localStorage.setItem('pi-chat-queue-collapsed', String(next));
-    } catch {
-      /* The toggle still works if browser storage is unavailable. */
-    }
-  }
-  return (
-    <div className="queue-dock">
+  if (!snapshot) return null;
+  if (!snapshot.queue?.length)
+    return (
       <section className="prompt-queue" aria-label="Prompt queue">
-        <button
-          className="queue-summary"
-          aria-label={collapsed ? 'Show prompt queue' : 'Hide prompt queue'}
-          aria-expanded={!collapsed}
-          aria-controls={collapsed ? undefined : bodyId}
-          onClick={toggle}
-        >
-          <ListOrdered size={14} />
-          <strong>{snapshot.queue.length} queued</strong>
-          <span className="queue-state">
-            {snapshot.queuePaused ? 'Paused' : 'Runs one at a time'}
-          </span>
-          <span className="queue-toggle-label">{collapsed ? 'Show' : 'Hide'}</span>
-          <ChevronDown size={13} />
-        </button>
-        {!collapsed && (
-          <div className="queue-body" id={bodyId}>
-            <div className="queue-controls">
+        <h3>Queue</h3>
+        <p>Nothing queued. Additional prompts wait here while Pi works.</p>
+      </section>
+    );
+  const base = `/chats/${snapshot.chat.id}/queue`;
+  return (
+    <section className="prompt-queue" aria-label="Prompt queue">
+      <h3>Queue · {snapshot.queue.length} queued</h3>
+      <p>{snapshot.queuePaused ? 'Paused' : 'Runs one at a time'}</p>
+      <div className="queue-body">
+        <div className="queue-controls">
+          <button
+            onClick={() =>
+              void api(base, {
+                method: 'PATCH',
+                body: JSON.stringify({ paused: !snapshot.queuePaused }),
+              }).catch((e) => onError(e.message))
+            }
+          >
+            {snapshot.queuePaused ? <Play size={12} /> : <Pause size={12} />}
+            {snapshot.queuePaused ? 'Resume queue' : 'Pause queue'}
+          </button>
+        </div>
+        <ol>
+          {snapshot.queue.map((prompt) => (
+            <li key={prompt.id}>
+              <span title={prompt.text}>{prompt.text}</span>
               <button
+                className="icon-button"
+                aria-label={`Remove queued prompt ${prompt.text.slice(0, 30)}`}
                 onClick={() =>
-                  void api(base, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ paused: !snapshot.queuePaused }),
-                  }).catch((e) => onError(e.message))
+                  void api(`${base}/${prompt.id}`, { method: 'DELETE', body: '{}' }).catch((e) =>
+                    onError(e.message),
+                  )
                 }
               >
-                {snapshot.queuePaused ? <Play size={12} /> : <Pause size={12} />}
-                {snapshot.queuePaused ? 'Resume queue' : 'Pause queue'}
+                <X size={12} />
               </button>
-            </div>
-            <ol>
-              {snapshot.queue.map((prompt) => (
-                <li key={prompt.id}>
-                  <span title={prompt.text}>{prompt.text}</span>
-                  <button
-                    className="icon-button"
-                    aria-label={`Remove queued prompt ${prompt.text.slice(0, 30)}`}
-                    onClick={() =>
-                      void api(`${base}/${prompt.id}`, { method: 'DELETE', body: '{}' }).catch(
-                        (e) => onError(e.message),
-                      )
-                    }
-                  >
-                    <X size={12} />
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-      </section>
-    </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 }

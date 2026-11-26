@@ -32,6 +32,7 @@ for (const width of [1280, 390]) {
       await request.patch(base, { data: { approvalMode: true } });
       await page.addInitScript((id) => localStorage.setItem('pi-chat-active', id), chat.id);
       await page.goto('/');
+      await page.getByRole('button', { name: 'Show task plan', exact: true }).click();
       const plan = page.locator('.task-plan');
       const labels = plan.locator('.plan-step-text');
       await expect(labels).toHaveText(['A', 'Running', 'B', 'Done', 'C']);
@@ -124,6 +125,7 @@ for (const width of [1280, 390]) {
       await expect(labels).toHaveText([...ordered, 'From another tab']);
       await expect(input).toHaveValue('Keep this draft');
       await page.reload();
+      await page.getByRole('button', { name: 'Show task plan', exact: true }).click();
       await expect(labels).toHaveText([...ordered, 'From another tab']);
 
       // A live update invalidates a drag that began against an older revision.

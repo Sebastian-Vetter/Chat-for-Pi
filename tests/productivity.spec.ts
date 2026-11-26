@@ -72,7 +72,7 @@ async function openConversation(page: Page, id: string) {
     };
   }, id);
   await page.goto('/');
-  await expect(page.locator('.task-plan summary')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show task plan', exact: true })).toBeVisible();
 }
 
 for (const width of [1280, 390]) {
@@ -119,7 +119,7 @@ for (const width of [1280, 390]) {
           .getByRole('button', { name: 'Close sidebar', exact: true })
           .click();
 
-      await page.locator('.task-plan summary').click();
+      await page.getByRole('button', { name: 'Show task plan', exact: true }).click();
       await page
         .getByRole('textbox', { name: 'New plan step', exact: true })
         .fill('Verify the workflow');

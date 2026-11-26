@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { api, type Snapshot } from './api';
-import TaskPlan from './TaskPlan';
 
 export default function TaskPanel({
   snapshot,
@@ -13,10 +12,7 @@ export default function TaskPanel({
   const chat = snapshot?.chat;
   if (!chat) return null;
   const approvals = snapshot?.approvals ?? [];
-  const busy =
-    !!snapshot?.busy ||
-    approvals.some((request) => request.tool === 'configured_test') ||
-    !!snapshot?.events?.some((event) => event.type === 'test' && event.status === 'running');
+  if (!approvals.length) return null;
 
   async function decide(id: string, approved: boolean) {
     if (!chat) return;
@@ -64,7 +60,6 @@ export default function TaskPanel({
           </button>
         </section>
       ))}
-      <TaskPlan key={chat.id} chat={chat} busy={busy} onError={onError} />
     </div>
   );
 }
