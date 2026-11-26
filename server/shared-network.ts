@@ -7,7 +7,8 @@ import { execFileSync } from 'node:child_process';
 import { X509Certificate } from 'node:crypto';
 import { isIP } from 'node:net';
 import express from 'express';
-import type { SharedInvite, SignedRequest } from './shared.js';
+import type { SharedInvite, SharedTarget, SignedRequest } from './shared.js';
+import { SharedAccessClient } from './shared-access-client.js';
 import { SharedService, invitationMessage } from './shared.js';
 import { proof, validPeer } from './shared-identity.js';
 
@@ -90,14 +91,16 @@ export function remoteCall(
   target: { endpoint: string; certificate: string },
   token: string,
   envelope: SignedRequest,
+  surface: 'rpc' | 'access' = 'rpc',
 ): Promise<unknown> {
   validateTarget(target);
   const body = JSON.stringify(envelope);
-  if (Buffer.byteLength(body) > 12 * 1024 * 1024) throw new Error('Shared request too large');
+  if (Buffer.byteLength(body) > (surface === 'access' ? 24 * 1024 : 12 * 1024 * 1024))
+    throw new Error('Shared request too large');
   const expected = new X509Certificate(target.certificate).fingerprint256;
   return new Promise((resolve, reject) => {
     const request = https.request(
-      new URL('rpc', target.endpoint),
+      new URL(surface, target.endpoint),
       {
         method: 'POST',
         ca: target.certificate,
@@ -118,7 +121,8 @@ export function remoteCall(
         const chunks: Buffer[] = [];
         response.on('data', (chunk: Buffer) => {
           size += chunk.length;
-          if (size > 14 * 1024 * 1024) response.destroy(new Error('Shared response too large'));
+          if (size > (surface === 'access' ? 64 * 1024 : 14 * 1024 * 1024))
+            response.destroy(new Error('Shared response too large'));
           else chunks.push(chunk);
         });
         response.on('error', reject);
@@ -163,9 +167,27 @@ export class SharedNetwork {
       address: string;
       sessions: { id: string; title: string }[];
       expires: number;
+      target?: Omit<SharedTarget, 'sessionId'>;
     }
   >();
-  constructor(private shared: SharedService) {}
+  readonly access: SharedAccessClient;
+  constructor(private shared: SharedService) {
+    this.access = new SharedAccessClient(shared, (target, request) =>
+      remoteCall(target, '', request, 'access'),
+    );
+  }
+  async requestAccess(ownerId: string, sessionId: string) {
+    const peer = this.found.get(ownerId);
+    const session = peer?.sessions.find((session) => session.id === sessionId);
+    if (!peer || peer.expires < Date.now() || !session)
+      throw new Error('Session is no longer discovered; refresh discovery');
+    if (!peer.target)
+      throw new Error(
+        'The owner needs an updated app for access requests; use an invitation instead',
+      );
+    await this.access.request({ ...peer.target, sessionId }, session.title);
+    return this.status();
+  }
   status() {
     for (const [id, peer] of this.found) if (peer.expires < Date.now()) this.found.delete(id);
     return {
@@ -173,7 +195,11 @@ export class SharedNetwork {
       address: this.address,
       port: this.port,
       addresses: lanAddresses(),
-      peers: [...this.found.values()].map(({ expires: _expiry, ...peer }) => peer),
+      peers: [...this.found.values()].map(({ expires: _expiry, target, ...peer }) => ({
+        ...peer,
+        canRequest: !!target,
+      })),
+      requests: this.access.list(),
     };
   }
   async start(address: string, port = 45479, discover = true) {
@@ -247,6 +273,15 @@ export class SharedNetwork {
         }
         limits.set(ip, state);
         if (
+          req.method === 'POST' &&
+          req.path === '/access' &&
+          req.is('application/json') &&
+          !req.headers['content-encoding']
+        ) {
+          next();
+          return;
+        }
+        if (
           !/^Bearer [A-Za-z0-9_-]{43}$/.test(req.headers.authorization ?? '') ||
           !this.shared.acceptsCapability(req.headers.authorization!.slice(7)) ||
           !req.is('application/json') ||
@@ -256,6 +291,16 @@ export class SharedNetwork {
           return;
         }
         next();
+      });
+      app.post('/access', express.json({ limit: '24kb', inflate: false }), (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        try {
+          res.json(this.shared.accessRPC(req.body));
+        } catch (error) {
+          res
+            .status(403)
+            .json({ error: error instanceof Error ? error.message : 'Access request rejected' });
+        }
       });
       app.use(express.json({ limit: '12mb', inflate: false }));
       app.post('/rpc', (req, res) => {
@@ -333,6 +378,68 @@ export class SharedNetwork {
       link: `http://127.0.0.1:3001/#join=${Buffer.from(JSON.stringify(invitation)).toString('base64url')}`,
     };
   }
+  advertisement() {
+    if (!this.server?.listening) throw new Error('Enable LAN sharing first');
+    const payload = JSON.stringify({
+      version: 1,
+      at: Date.now(),
+      peer: this.shared.identity.public(),
+      sessions: this.shared.advertisements(),
+      endpoint: `https://${this.address}:${this.port}/`,
+      certificate: this.certificate,
+    });
+    return Buffer.from(JSON.stringify({ payload, signature: this.shared.identity.sign(payload) }));
+  }
+  observe(bytes: Buffer, address: string) {
+    if (bytes.length > 8000 || !privateAddress(address)) return;
+    try {
+      const envelope = JSON.parse(bytes.toString('utf8'));
+      const value = JSON.parse(envelope.payload);
+      validPeer(value.peer);
+      if (
+        value.version !== 1 ||
+        !Number.isSafeInteger(value.at) ||
+        Math.abs(Date.now() - value.at) > 15000 ||
+        !proof(value.peer.publicKey, envelope.payload, envelope.signature) ||
+        value.peer.id === this.shared.identity.public().id ||
+        !Array.isArray(value.sessions) ||
+        value.sessions.length > 20 ||
+        value.sessions.some(
+          (item: { id: string; title: string }) =>
+            typeof item.id !== 'string' ||
+            !/^[a-f0-9-]{36}$/.test(item.id) ||
+            typeof item.title !== 'string' ||
+            item.title.length > 120,
+        )
+      )
+        return;
+      let target: Omit<SharedTarget, 'sessionId'> | undefined;
+      if (value.endpoint !== undefined || value.certificate !== undefined) {
+        validateTarget(value);
+        if (new URL(value.endpoint).hostname !== address) return;
+        target = {
+          endpoint: value.endpoint,
+          certificate: value.certificate,
+          ownerId: value.peer.id,
+          owner: { id: value.peer.id, name: value.peer.name, publicKey: value.peer.publicKey },
+        };
+      }
+      if (this.found.size >= 100 && !this.found.has(value.peer.id)) return;
+      this.found.set(value.peer.id, {
+        id: value.peer.id,
+        name: value.peer.name,
+        address,
+        sessions: value.sessions.map((session: { id: string; title: string }) => ({
+          id: session.id,
+          title: session.title,
+        })),
+        target,
+        expires: Date.now() + 12000,
+      });
+    } catch {
+      /* Untrusted discovery never grants access. */
+    }
+  }
   private discovery() {
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
     this.socket = socket;
@@ -346,40 +453,7 @@ export class SharedNetwork {
         }
       }
     });
-    socket.on('message', (bytes, sender) => {
-      if (bytes.length > 8000 || !privateAddress(sender.address)) return;
-      try {
-        const envelope = JSON.parse(bytes.toString('utf8'));
-        const value = JSON.parse(envelope.payload);
-        validPeer(value.peer);
-        if (
-          value.version !== 1 ||
-          !Number.isSafeInteger(value.at) ||
-          Math.abs(Date.now() - value.at) > 15000 ||
-          !proof(value.peer.publicKey, envelope.payload, envelope.signature) ||
-          value.peer.id === this.shared.identity.public().id ||
-          !Array.isArray(value.sessions) ||
-          value.sessions.length > 20 ||
-          value.sessions.some(
-            (item: { id: string; title: string }) =>
-              !/^[a-f0-9-]{36}$/.test(item.id) ||
-              typeof item.title !== 'string' ||
-              item.title.length > 120,
-          )
-        )
-          return;
-        if (this.found.size >= 100 && !this.found.has(value.peer.id)) return;
-        this.found.set(value.peer.id, {
-          id: value.peer.id,
-          name: value.peer.name,
-          address: sender.address,
-          sessions: value.sessions,
-          expires: Date.now() + 12000,
-        });
-      } catch {
-        /* Network advertisements are untrusted and never grant access. */
-      }
-    });
+    socket.on('message', (bytes, sender) => this.observe(bytes, sender.address));
     socket.bind(DISCOVERY_PORT, () => {
       if (this.socket !== socket) return;
       try {
@@ -397,15 +471,8 @@ export class SharedNetwork {
     });
     const announce = () => {
       if (!this.socket) return;
-      const payload = JSON.stringify({
-        version: 1,
-        at: Date.now(),
-        peer: this.shared.identity.public(),
-        sessions: this.shared.advertisements(),
-      });
-      const bytes = Buffer.from(
-        JSON.stringify({ payload, signature: this.shared.identity.sign(payload) }),
-      );
+      if (!this.server?.listening) return;
+      const bytes = this.advertisement();
       if (bytes.length <= 8000) {
         try {
           this.socket.send(bytes, DISCOVERY_PORT, GROUP, () => {});

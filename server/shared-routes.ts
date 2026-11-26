@@ -74,6 +74,27 @@ export function sharedRoutes(shared: SharedService, network: SharedNetwork) {
     }),
   );
   router.post(
+    '/network/access',
+    route(async (req) => {
+      if (typeof req.body?.ownerId !== 'string' || typeof req.body?.sessionId !== 'string')
+        throw new Error('Choose a discovered session');
+      return network.requestAccess(req.body.ownerId, req.body.sessionId);
+    }),
+  );
+  router.post(
+    '/network/access/poll',
+    route(async () => {
+      await network.access.poll();
+      return network.status();
+    }),
+  );
+  router.post(
+    '/sessions/:id/requests/:requestId',
+    route((req) =>
+      shared.decideAccess(String(req.params.id), String(req.params.requestId), req.body?.role),
+    ),
+  );
+  router.post(
     '/join',
     route(async (req) => {
       const invite = parseInvite(req.body?.link);

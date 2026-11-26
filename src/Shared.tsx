@@ -5,6 +5,12 @@ import SharedFiles, { sharedRequest } from './SharedFiles';
 import MessageView from './MessageView';
 import { useConversationScroll } from './useConversationScroll';
 import { TypingIndicator, useSharedTyping, type TypingPerson } from './SharedTyping';
+import {
+  AccessRequests,
+  type AccessRequest,
+  type OwnerAccessRequest,
+  type OutgoingAccessRequest,
+} from './SharedAccess';
 
 export interface Identity {
   id: string;
@@ -17,7 +23,14 @@ interface Participant extends Identity {
 }
 interface SharedListing {
   owner: Identity;
-  owned: { id: string; title: string; enabled: boolean; role: 'owner'; members: Participant[] }[];
+  owned: {
+    id: string;
+    title: string;
+    enabled: boolean;
+    role: 'owner';
+    members: Participant[];
+    requests?: AccessRequest[];
+  }[];
   joined: { id: string; title: string; ownerId: string }[];
 }
 interface Network {
@@ -25,7 +38,14 @@ interface Network {
   address: string;
   port: number;
   addresses: { name: string; address: string }[];
-  peers: { id: string; name: string; address: string; sessions: { id: string; title: string }[] }[];
+  peers: {
+    id: string;
+    name: string;
+    address: string;
+    canRequest?: boolean;
+    sessions: { id: string; title: string }[];
+  }[];
+  requests?: OutgoingAccessRequest[];
 }
 const emptyListing: SharedListing = {
   owner: { id: '', name: '', publicKey: '' },
@@ -152,10 +172,12 @@ export function NetworkRing({
   identity,
   changed,
   joined,
+  requests = [],
 }: {
   identity: Identity;
   changed: () => void;
   joined: (id: string) => void;
+  requests?: OwnerAccessRequest[];
 }) {
   const [open, setOpen] = useState(false);
   const [network, setNetwork] = useState<Network>();
@@ -165,6 +187,7 @@ export function NetworkRing({
   useEffect(() => setName(identity.name), [identity.name]);
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
+  const seenJoined = useRef(new Set<string>());
   useEffect(() => {
     const params = new URLSearchParams(location.hash.slice(1));
     if (params.has('join')) {
@@ -181,8 +204,15 @@ export function NetworkRing({
       if (loading) return;
       loading = true;
       try {
-        const next = await api<Network>('/shared/network');
+        let next = await api<Network>('/shared/network');
+        if (next.requests?.some((request) => request.state === 'pending'))
+          next = await api<Network>('/shared/network/access/poll', { method: 'POST', body: '{}' });
         if (!cancelled) {
+          for (const request of next.requests ?? [])
+            if (request.remoteId && !seenJoined.current.has(request.remoteId)) {
+              seenJoined.current.add(request.remoteId);
+              changed();
+            }
           setNetwork(next);
           setAddress((current) => current || next.addresses[0]?.address || '');
         }
@@ -193,7 +223,7 @@ export function NetworkRing({
       }
     }
     void load();
-    const timer = setInterval(() => void load(), 4000);
+    const timer = setInterval(() => void load(), 2000);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -215,20 +245,32 @@ export function NetworkRing({
       <button
         className="icon-button network-ring"
         aria-label="Local network shared sessions"
-        title="Shared sessions on your local network"
+        title={
+          requests.length
+            ? `${requests.length} access requests pending`
+            : 'Shared sessions on your local network'
+        }
+        aria-description={
+          requests.length ? `${requests.length} access requests pending` : undefined
+        }
         onClick={() => {
           setName(identity.name);
           setOpen(true);
         }}
       >
         <Circle size={18} />
+        {requests.length > 0 && (
+          <span className="network-request-badge" aria-hidden="true">
+            {requests.length}
+          </span>
+        )}
       </button>
       {open && (
         <Modal title="Local network" close={() => setOpen(false)}>
           <p>
             Sharing is opt-in and LAN-only. Enabling it announces your name and enabled session
-            titles on this LAN. Invitations are required; discovery does not grant access. The
-            private application stays local.
+            titles on this LAN. Request access from the owner or use an invitation. Discovery alone
+            does not grant access; names are unverified. The private application stays local.
           </p>
           <div className="shared-actions">
             <select
@@ -261,6 +303,7 @@ export function NetworkRing({
             </button>
           </div>
           {!network?.addresses.length && <p>No private LAN IPv4 interface available.</p>}
+          <AccessRequests requests={requests} changed={changed} />
           <h3>Available shared sessions</h3>
           <div className="network-peers">
             {network?.peers.some((peer) => peer.sessions.length) ? (
@@ -270,8 +313,43 @@ export function NetworkRing({
                     <Users size={14} />
                     <span>
                       {session.title}
-                      <small>{peer.name} · Invitation required · unverified discovery</small>
+                      <small>
+                        {peer.name} · unverified discovery
+                        {!peer.canRequest ? ' · Invitation required' : ''}
+                      </small>
                     </span>
+                    <button
+                      className="secondary-button"
+                      disabled={
+                        working ||
+                        !peer.canRequest ||
+                        network.requests?.some(
+                          (request) =>
+                            request.ownerId === peer.id &&
+                            request.sessionId === session.id &&
+                            request.state === 'pending',
+                        )
+                      }
+                      onClick={() =>
+                        void perform(async () => {
+                          const next = await api<Network>('/shared/network/access', {
+                            method: 'POST',
+                            body: JSON.stringify({ ownerId: peer.id, sessionId: session.id }),
+                          });
+                          setNetwork(next);
+                          changed();
+                        })
+                      }
+                    >
+                      {network.requests?.some(
+                        (request) =>
+                          request.ownerId === peer.id &&
+                          request.sessionId === session.id &&
+                          request.state === 'pending',
+                      )
+                        ? 'Request sent'
+                        : 'Request access'}
+                    </button>
                   </div>
                 )),
               )
@@ -282,6 +360,45 @@ export function NetworkRing({
               </p>
             )}
           </div>
+          {!!network?.requests?.length && (
+            <section
+              className="shared-outgoing-requests"
+              aria-label="Your access requests"
+              aria-live="polite"
+            >
+              <h3>Your requests</h3>
+              {network.requests.map((request) => (
+                <div key={request.id}>
+                  <strong>{request.title}</strong>
+                  <small>
+                    {request.ownerName} ·{' '}
+                    {request.state === 'pending'
+                      ? 'Waiting for owner approval'
+                      : request.state === 'approved'
+                        ? 'Access approved'
+                        : request.state === 'denied'
+                          ? 'Request declined by owner'
+                          : request.state === 'expired'
+                            ? 'Request expired; send a new request'
+                            : 'Owner unavailable; retry from discovery'}
+                  </small>
+                  {request.error && <p className="shared-error">{request.error}</p>}
+                  {request.remoteId && request.state === 'approved' && (
+                    <button
+                      className="secondary-button"
+                      onClick={() => {
+                        changed();
+                        joined(request.remoteId!);
+                        setOpen(false);
+                      }}
+                    >
+                      Open shared session
+                    </button>
+                  )}
+                </div>
+              ))}
+            </section>
+          )}
           <form
             onSubmit={(event) => {
               event.preventDefault();

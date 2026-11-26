@@ -4,6 +4,21 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-11-26
+
+### Added
+
+- LAN discovery entries now offer Request access without an invitation. Owners receive a quiet network-ring badge and can accept as reader/writer or reject each request. Requesters see pending/declined/approved status and can open an approved shared session.
+- Accepted installation identities persist across restarts and can renew connection credentials without repeated owner approval while sharing stays enabled. Credential renewal preserves queued writer authorization; sharing off and explicit revocation still invalidate access. Pending owner requests persist, repeated requests are idempotent, and rejected requests do not create repeated notifications.
+
+### Security
+
+- Discovery signs the advertised HTTPS endpoint/certificate, binds it to the sender's private LAN address, and remains explicitly unverified for human identity. A separate bounded access-request endpoint accepts only signed request/status operations, never conversation/file operations or owner decisions. Approvals bind to the requester's installation key; existing owner-key pinning, replay protection, private API isolation and request limits remain enforced.
+
+### Tests
+
+- Added real pinned-TLS discovery/request/approval/reconnect tests, persisted grants, stale decision/replay/tampering rejection, reader permissions, denied/off/revoked access, request limits and known-owner key mismatch coverage. Desktop/mobile tests exercise invitation-free requests, status polling, owner role selection/rejection, the unobtrusive badge and opening an approved conversation without provider calls.
+
 ## [1.2.4] - 2026-11-26
 
 ### Added
