@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Circle, Copy, Plus, Users, X } from 'lucide-react';
+import { ArrowUp, Circle, Copy, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { api, type Chat, type Message } from './api';
 import SharedFiles, { sharedRequest } from './SharedFiles';
 import MessageView from './MessageView';
 import { useConversationScroll } from './useConversationScroll';
+import { TypingIndicator, useSharedTyping, type TypingPerson } from './SharedTyping';
 
 export interface Identity {
   id: string;
@@ -616,6 +617,7 @@ export function SharedSidebar({
 }
 interface RemoteSnapshot {
   historyLimited?: boolean;
+  typing?: TypingPerson[];
   id: string;
   title: string;
   owner: Identity;
@@ -632,16 +634,28 @@ export function RemoteSharedView({
   changed,
   roleChanged,
   networkControl,
+  sidebarControl,
+  identityId,
 }: {
   id: string;
   changed: () => void;
   roleChanged: (role: 'reader' | 'writer' | undefined) => void;
   networkControl: React.ReactNode;
+  sidebarControl?: React.ReactNode;
+  identityId: string;
 }) {
   const [snapshot, setSnapshot] = useState<RemoteSnapshot>();
   const [draft, setDraft] = useState('');
+  const typing = useSharedTyping(id, true, snapshot?.role === 'writer');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+  const input = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (input.current) {
+      input.current.style.height = 'auto';
+      input.current.style.height = `${Math.min(input.current.scrollHeight, 180)}px`;
+    }
+  }, [draft, snapshot?.role]);
   const [version, setVersion] = useState(0);
   const { viewportRef, contentRef, paused, scrollToLatest } = useConversationScroll(
     id,
@@ -685,6 +699,7 @@ export function RemoteSharedView({
       );
       return;
     }
+    typing.stop();
     const submitted = draft;
     setSending(true);
     try {
@@ -699,103 +714,138 @@ export function RemoteSharedView({
   }
   return (
     <>
-      <header className="topbar">
+      <header className="topbar shared-session-topbar shared-remote-topbar">
         <div className="topbar-left">
-          <Users size={16} />
+          {sidebarControl}
+          <Users size={16} aria-hidden="true" />
           <span className="page-title">{snapshot?.title ?? 'Shared session'}</span>
           <span className="subtle-pill">{snapshot?.role ?? 'Connecting'}</span>
         </div>
-        {networkControl}
-        <button
-          className="icon-button"
-          title="Refresh shared session"
-          aria-label="Refresh shared session"
-          onClick={() => {
-            setVersion((value) => value + 1);
-            changed();
-          }}
-        >
-          ↻
-        </button>
+        <div className="shared-header-actions">
+          {networkControl}
+          <button
+            className="icon-button"
+            title="Refresh shared session"
+            aria-label="Refresh shared session"
+            onClick={() => {
+              setVersion((value) => value + 1);
+              changed();
+            }}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+          </button>
+        </div>
       </header>
       {snapshot && (
-        <p className="shared-owner">
-          Owner · {snapshot.owner.name}
-          {snapshot.busy ? ' · Working' : ''}
-          {snapshot.queue.length
-            ? ` · ${snapshot.queue.length} queued${snapshot.queuePaused ? ' · Paused' : ''}`
-            : ''}
-        </p>
-      )}
-      {snapshot?.historyLimited && (
-        <p className="shared-owner">
-          LAN view is limited to the latest 100 messages and 20,000 characters per message. Full
-          history remains with the owner.
-        </p>
+        <div className="shared-remote-meta">
+          <p className="shared-owner" title={`Owner installation ${snapshot.owner.id}`}>
+            Owner · {snapshot.owner.name}
+            {snapshot.busy ? ' · Working' : ''}
+            {snapshot.queue.length
+              ? ` · ${snapshot.queue.length} queued${snapshot.queuePaused ? ' · Paused' : ''}`
+              : ''}
+          </p>
+          {snapshot.historyLimited && (
+            <p className="shared-owner">
+              LAN view is limited to the latest 100 messages and 20,000 characters per message. Full
+              history remains with the owner.
+            </p>
+          )}
+        </div>
       )}
       <div
         ref={viewportRef}
         className="conversation-scroll shared-remote-transcript"
+        role="region"
+        tabIndex={0}
         aria-label="Shared conversation"
       >
         <div ref={contentRef} className="conversation-content">
-          {snapshot?.messages.map((message, index) => (
-            <MessageView key={index} message={message} remoteContent />
-          ))}
+          <section className="transcript" aria-label="Shared messages">
+            {snapshot?.messages.map((message, index) => (
+              <MessageView key={index} message={message} remoteContent />
+            ))}
+          </section>
         </div>
       </div>
       {paused && (
-        <button className="secondary-button" onClick={() => scrollToLatest()}>
-          Jump to latest
-        </button>
-      )}
-      {error && (
-        <p className="shared-error" role="alert">
-          {error}
-        </p>
-      )}
-      {snapshot?.error && (
-        <p className="shared-error" role="status">
-          {snapshot.error}
-        </p>
-      )}
-      {snapshot?.role === 'writer' ? (
-        <form
-          className="shared-remote-composer"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void send();
-          }}
-        >
-          <textarea
-            aria-label="Message shared session"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void send();
-              }
-            }}
-            placeholder="Write to the shared project…"
-          />
-          <button
-            className="secondary-button"
-            disabled={!draft.trim() || sending || (!snapshot.queuesEnabled && snapshot.busy)}
-          >
-            Send to shared session
+        <div className="latest-message-bar">
+          <button className="secondary-button" onClick={() => scrollToLatest()}>
+            Jump to latest
           </button>
-          <small>
-            Prompts run on the owner's machine. Existing work is queued when queues are enabled.
-          </small>
-        </form>
-      ) : (
-        <p className="shared-owner">
-          {snapshot
-            ? 'Read-only access. Only the owner can change your role.'
-            : 'Waiting for an authenticated connection to the owner.'}
-        </p>
+        </div>
       )}
+      <div className="composer-area shared-remote-footer">
+        <TypingIndicator people={snapshot?.typing ?? []} self={identityId} />
+        {error && (
+          <p className="shared-error" role="alert" tabIndex={0}>
+            {error}
+          </p>
+        )}
+        {snapshot?.error && (
+          <p className="shared-error" role="status" tabIndex={0}>
+            {snapshot.error}
+          </p>
+        )}
+        {snapshot?.role === 'writer' ? (
+          <form
+            className="composer shared-remote-composer"
+            aria-label="Shared message composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void send();
+            }}
+          >
+            <textarea
+              ref={input}
+              rows={2}
+              aria-label="Message shared session"
+              value={draft}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                typing.changed(event.target.value);
+              }}
+              onBlur={typing.stop}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder="Write to the shared project…"
+            />
+            <div className="composer-toolbar">
+              <span className="shared-composer-hint">
+                {snapshot.busy
+                  ? snapshot.queuesEnabled
+                    ? 'Enter to queue'
+                    : 'Wait for the current reply'
+                  : 'Enter to send'}{' '}
+                · Shift+Enter newline
+              </span>
+              <button
+                className="send-button"
+                aria-label="Send to shared session"
+                title="Send to shared session"
+                disabled={!draft.trim() || sending || (!snapshot.queuesEnabled && snapshot.busy)}
+              >
+                <ArrowUp size={20} aria-hidden="true" />
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p className="shared-owner shared-reader-note">
+            {snapshot
+              ? 'Read-only access. Only the owner can change your role.'
+              : 'Waiting for an authenticated connection to the owner.'}
+          </p>
+        )}
+        {snapshot?.role === 'writer' && (
+          <p className="composer-disclaimer">
+            Prompts run on the owner's machine. Existing work is queued when queues are enabled.
+          </p>
+        )}
+      </div>
     </>
   );
 }

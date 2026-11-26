@@ -48,8 +48,7 @@
   font-size: 12px;
 }
 .shared-dialog input:not([type='checkbox']),
-.shared-dialog select,
-.shared-remote-composer textarea {
+.shared-dialog select {
   background: #151b15;
   border: 1px solid #b5d7a52b;
   border-radius: 6px;
@@ -267,29 +266,84 @@
   color: #8e9d87;
   margin: 8px 18px;
 }
-.shared-remote-transcript {
+.shared-session-topbar .topbar-left {
   flex: 1;
-  min-height: 0;
 }
-.shared-remote-composer {
-  margin: 12px 18px;
+.shared-session-topbar .topbar-left > svg,
+.shared-session-topbar .icon-button {
+  flex-shrink: 0;
+}
+.shared-session-topbar .subtle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.shared-header-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
 }
-.shared-remote-composer textarea {
+.shared-remote-meta {
   width: 100%;
-  min-height: 70px;
-  resize: vertical;
+  max-width: 854px;
+  margin: 0 auto;
+  padding: 12px 30px 0;
+  flex-shrink: 0;
 }
-.shared-remote-composer small {
-  font-size: 10px;
+.shared-remote-meta .shared-owner,
+.shared-remote-footer .shared-owner {
+  margin: 0;
+  line-height: 1.7;
+}
+.shared-remote-meta .shared-owner + .shared-owner {
+  margin-top: 5px;
+}
+.shared-remote-footer.composer-area {
+  flex-shrink: 0;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.shared-remote-footer .shared-error {
+  margin: 0 0 12px;
+  max-height: 96px;
+  overflow: auto;
+}
+.shared-typing {
+  min-height: 20px;
+  margin: 0 4px 5px;
+  color: #8e9d87;
+  font-size: 11px;
+  line-height: 20px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.shared-composer-hint {
   color: #78886f;
+  font-size: 10px;
+  line-height: 1.6;
+  min-width: 0;
 }
-.shared-mobile-menu {
-  align-self: flex-start;
-  margin: 4px 8px;
+@media (max-width: 1000px) {
+  .shared-remote-meta {
+    padding-inline: 22px;
+  }
+}
+@media (max-width: 760px) {
+  .shared-remote-meta {
+    padding-inline: 14px;
+  }
+  .shared-session-topbar.topbar {
+    gap: 8px;
+  }
+  .shared-session-topbar .workspace-button {
+    padding: 8px;
+  }
+  .shared-session-topbar .workspace-button > span,
+  .shared-session-topbar .workspace-button > .lucide-chevron-down {
+    display: none;
+  }
 }
 @media (pointer: coarse) {
   .network-ring,

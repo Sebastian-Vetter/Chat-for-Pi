@@ -4,6 +4,48 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-11-26
+
+### Added
+
+- Shared chats show a quiet, accessible “Name is typing…” indicator directly above the input. Owners and writers announce typing; readers can observe it. Multiple participants are summarized and your own name is hidden.
+- Typing metadata contains no draft text and is never persisted or sent to a model. Per-tab leases renew while typing, stop on idle/blur/send/navigation, expire after six seconds on disconnect, and are cleared on role changes or sharing off. Backend permissions prevent reader announcements and names come from authenticated installation identities.
+
+### Tests
+
+- Added lease-expiry, renewal, multiple-tab isolation, validation, revocation, reader-denial and real TLS presence tests. Desktop/mobile owner/writer/reader regressions verify positioning, names, self-filtering, idle/blur cleanup, draft preservation and metadata-only requests.
+
+## [1.2.3] - 2026-11-26
+
+### Fixed
+
+- Shared participant conversations now reuse the private chat's padded, centered transcript and bounded composer instead of rendering messages directly against the panel edge. Reader notices, owner metadata and connection errors also keep consistent gutters.
+- Unified the writer composer with the normal chat styling and icon send control, with bounded auto-growing drafts. Integrated the mobile sidebar button into the shared header, kept roles visible on narrow screens, and contained long titles, owner names and code blocks without horizontal page overflow.
+
+### Tests
+
+- Added reader/writer desktop/mobile layout regressions with long titles, owner names, code lines, multiline drafts, short viewports and offline errors. Verified message/footer gutters, maximum widths, header alignment, transcript/composer separation and screenshots without provider calls.
+
+## [1.2.2] - 2026-11-26
+
+### Changed
+
+- Moved the icon-only conversation export controls from the top toolbar to the bottom-right edge of the conversation, after the composer. The compact footer stays clear of message input and respects safe-area insets; selected-response export remains alongside whole-chat export.
+
+### Tests
+
+- Desktop/mobile layout coverage verifies export controls remain at the bottom-right edge without overlapping the composer at normal and short viewport heights. Existing Markdown download and keyboard tests continue to cover full and selected exports.
+
+## [1.2.1] - 2026-11-26
+
+### Fixed
+
+- Prevent duplicate task-plan and prompt-queue bars after switching between shared and private conversations. WorkDock and the approval panel now use distinct React sibling keys, so old work controls are removed reliably on conversation changes.
+
+### Tests
+
+- Added desktop/mobile regressions that repeatedly switch between shared and private sessions, verify exactly one work bar/details panel with the selected conversation's plan and queue, and reject duplicate-key console warnings. Queues remain paused throughout; no provider calls.
+
 ## [1.2.0] - 2026-11-26
 
 ### Added

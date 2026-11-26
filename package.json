@@ -1,6 +1,6 @@
 {
   "name": "pi-chat",
-  "version": "1.2.0",
+  "version": "1.2.4",
   "private": true,
   "description": "Local web workspace and background server for Pi",
   "repository": {

@@ -1,14 +1,10 @@
 .conversation-actions {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
   gap: 7px;
-  padding: 8px 18px;
-  border-bottom: 1px solid #ffffff0b;
-}
-.conversation-actions .secondary-button {
-  font-size: 11px;
-  padding: 5px 9px;
+  padding: 0 max(8px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) 8px;
 }
 .conversation-export {
   display: inline-flex;
@@ -339,10 +335,6 @@
   .plan-move-controls button {
     min-width: 44px;
     min-height: 44px;
-  }
-  .conversation-actions {
-    padding: 7px 10px;
-    gap: 6px;
   }
   .task-plan,
   .approval-request {

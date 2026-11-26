@@ -35,6 +35,7 @@ import { version as appVersion } from '../package.json';
 import CommandPalette, { type PaletteAction } from './CommandPalette';
 import TaskPanel from './TaskPanel';
 import WorkDock from './WorkDock';
+import { TypingIndicator, useSharedTyping } from './SharedTyping';
 import ConversationActions from './ConversationActions';
 import './productivity.css';
 import {
@@ -240,6 +241,7 @@ export default function App() {
   async function send(event?: FormEvent) {
     event?.preventDefault();
     if (!draft.trim() || submitting.current) return;
+    ownedTyping.stop();
     const command = draft.trim();
     const localCommands: Record<string, () => void> = {
       '/help': () => setCommandsOpen(true),
@@ -338,6 +340,11 @@ export default function App() {
     }
   }
   const currentChat = chats.find((chat) => chat.id === active);
+  const typingEnabled =
+    !remote &&
+    !!currentChat?.shared &&
+    !!sharing.listing.owned.find((share) => share.id === active)?.enabled;
+  const ownedTyping = useSharedTyping(typingEnabled ? active : null, false, typingEnabled);
   const messages = snapshot?.messages ?? [];
   const selectedModel = model || snapshot?.model || '';
   const runningCount = Object.values(runningChats).filter(Boolean).length;
@@ -536,20 +543,23 @@ export default function App() {
       <main className="main-panel">
         {remote ? (
           <>
-            {!sidebar && (
-              <button
-                className="icon-button shared-mobile-menu"
-                aria-label="Open sidebar"
-                onClick={() => setSidebar(true)}
-              >
-                <Menu size={20} />
-              </button>
-            )}
             <RemoteSharedView
               key={remote}
               id={remote}
               changed={refreshShared}
               roleChanged={setRemoteRole}
+              identityId={sharing.listing.owner.id}
+              sidebarControl={
+                !sidebar && (
+                  <button
+                    className="icon-button"
+                    aria-label="Open sidebar"
+                    onClick={() => setSidebar(true)}
+                  >
+                    <Menu size={20} />
+                  </button>
+                )
+              }
               networkControl={
                 <NetworkRing
                   identity={sharing.listing.owner}
@@ -561,7 +571,7 @@ export default function App() {
           </>
         ) : (
           <>
-            <header className="topbar">
+            <header className={`topbar ${currentChat?.shared ? 'shared-session-topbar' : ''}`}>
               <div className="topbar-left">
                 {!sidebar && (
                   <button
@@ -613,19 +623,18 @@ export default function App() {
               show={() => setUpdatesOpen(true)}
               close={() => setUpdatesOpen(false)}
             />
-            <ConversationActions
-              chat={currentChat}
-              messages={messages}
-              selectedResponses={selectedResponses}
-            />
             <WorkDock
-              key={active ?? 'new'}
+              key={`work-dock:${active ?? 'new'}`}
               snapshot={snapshot}
               showPlan={preferences.showTaskPlan}
               queuesEnabled={queuesEnabled}
               onError={setError}
             />
-            <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
+            <TaskPanel
+              key={`task-panel:${active ?? 'new'}`}
+              snapshot={snapshot}
+              onError={setError}
+            />
             <div
               className="conversation-scroll"
               ref={viewportRef}
@@ -718,6 +727,9 @@ export default function App() {
                   </button>
                 </div>
               )}
+              {typingEnabled && (
+                <TypingIndicator people={ownedTyping.people} self={sharing.listing.owner.id} />
+              )}
               <form
                 className={`composer ${busy ? 'composer-working' : ''}`}
                 aria-label="Message composer"
@@ -739,7 +751,11 @@ export default function App() {
                   }
                   rows={2}
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    ownedTyping.changed(e.target.value);
+                  }}
+                  onBlur={ownedTyping.stop}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
@@ -813,6 +829,11 @@ export default function App() {
                 </p>
               </div>
             </div>
+            <ConversationActions
+              chat={currentChat}
+              messages={messages}
+              selectedResponses={selectedResponses}
+            />
           </>
         )}
       </main>

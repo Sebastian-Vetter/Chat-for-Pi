@@ -104,7 +104,11 @@ export function sharedRoutes(shared: SharedService, network: SharedNetwork) {
     '/joined/:id/rpc',
     route((req) => {
       const remote = shared.remote(String(req.params.id));
-      if (!['snapshot', 'list', 'read', 'write', 'remove', 'message'].includes(req.body?.operation))
+      if (
+        !['snapshot', 'list', 'read', 'write', 'remove', 'message', 'typing'].includes(
+          req.body?.operation,
+        )
+      )
         throw new Error('Unsupported shared operation');
       return remoteCall(
         remote.invite,
@@ -117,6 +121,14 @@ export function sharedRoutes(shared: SharedService, network: SharedNetwork) {
         ),
       );
     }),
+  );
+  router.get(
+    '/sessions/:id/typing',
+    route((req) => shared.typingPeople(String(req.params.id))),
+  );
+  router.post(
+    '/sessions/:id/typing',
+    route((req) => shared.ownerTyping(String(req.params.id), req.body?.client, req.body?.active)),
   );
   router.post(
     '/sessions/:id/files',
