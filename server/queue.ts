@@ -5,6 +5,8 @@ export interface QueuedPrompt {
   id: string;
   text: string;
   model?: string;
+  actorId?: string;
+  actorGrant?: string;
   timestamp: string;
 }
 interface QueueState {
@@ -30,10 +32,16 @@ export class PromptQueues {
     }
     return this.states.get(id)!;
   }
-  add(id: string, text: string, model?: string) {
+  add(id: string, text: string, model?: string, actorId?: string, actorGrant?: string) {
     const state = this.state(id);
     if (state.items.length >= 20) throw new Error('Queue limit reached (20 pending prompts).');
-    const prompt = { id: randomUUID(), text, model, timestamp: new Date().toISOString() };
+    const prompt = {
+      id: randomUUID(),
+      text,
+      model,
+      ...(actorId ? { actorId, actorGrant } : {}),
+      timestamp: new Date().toISOString(),
+    };
     state.items.push(prompt);
     this.save(id);
     return prompt;

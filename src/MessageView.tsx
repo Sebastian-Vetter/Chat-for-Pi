@@ -35,10 +35,12 @@ export default function MessageView({
   message,
   selected,
   toggleSelected,
+  remoteContent = false,
 }: {
   message: Message;
   selected?: boolean;
   toggleSelected?: () => void;
+  remoteContent?: boolean;
 }) {
   if (message.role === 'toolResult') {
     return (
@@ -71,6 +73,11 @@ export default function MessageView({
           <Markdown
             remarkPlugins={[remarkGfm]}
             components={{
+              img: remoteContent
+                ? ({ alt }) => (
+                    <span>[Image: {alt || 'shared image'} — use shared files to download]</span>
+                  )
+                : undefined,
               a: ({ children, ...props }) => (
                 <a {...props} target="_blank" rel="noreferrer">
                   {children}

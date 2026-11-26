@@ -12,6 +12,7 @@ import {
   Sparkles,
   Square,
   Terminal,
+  Users,
   X,
 } from 'lucide-react';
 import { api, type Chat, type Config, type Snapshot, type QueueSettings } from './api';
@@ -36,6 +37,15 @@ import TaskPanel from './TaskPanel';
 import WorkDock from './WorkDock';
 import ConversationActions from './ConversationActions';
 import './productivity.css';
+import {
+  useShared,
+  IdentitySetup,
+  NetworkRing,
+  SharedSidebar,
+  RemoteSharedView,
+  SharedFiles,
+} from './Shared';
+import './shared.css';
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -45,6 +55,19 @@ export default function App() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [active, setActive] = useState<string | null>(() => localStorage.getItem('pi-chat-active'));
   const [snapshot, setSnapshot] = useState<Snapshot>();
+  const sharing = useShared();
+  const [sidebarTab, setSidebarTab] = useState<'chats' | 'shared'>('chats');
+  const [remote, setRemote] = useState<string | null>(null);
+  const [remoteRole, setRemoteRole] = useState<'reader' | 'writer'>();
+  function refreshShared() {
+    void sharing.refresh().catch((error) => setError(errorText(error)));
+  }
+  function selectRemote(id: string) {
+    setRemote(id || null);
+    setRemoteRole(undefined);
+    setSidebarTab('shared');
+    if (window.innerWidth <= 760) setSidebar(false);
+  }
   const [draft, setDraft] = useState('');
   const sessionList = useSessionList();
   const [model, setModel] = useState('');
@@ -80,7 +103,7 @@ export default function App() {
   const responseVersion =
     responseIndex < 0 ? undefined : `${responseIndex}:${snapshot?.messages[responseIndex].text}`;
   const { viewportRef, contentRef, scrollToLatest, paused, hasNewReply } = useConversationScroll(
-    active,
+    remote ? null : active,
     responseVersion,
   );
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -190,6 +213,9 @@ export default function App() {
     }
   }, [draft]);
   function selectChat(id: string | null) {
+    setRemote(null);
+    setRemoteRole(undefined);
+    setSidebarTab(chats.find((chat) => chat.id === id)?.shared ? 'shared' : 'chats');
     scrollToLatest();
     drafts.current[active ?? 'new'] = draft;
     setActive(id);
@@ -331,7 +357,7 @@ export default function App() {
     { id: 'commands', kind: 'Action', label: 'Web commands', run: () => setCommandsOpen(true) },
     ...chats.map((chat) => ({
       id: `chat-${chat.id}`,
-      kind: chat.archived ? 'Archived chat' : 'Chat',
+      kind: chat.shared ? 'Shared · Owner' : chat.archived ? 'Archived chat' : 'Chat',
       label: chat.title,
       detail: chat.cwd,
       run: () => {
@@ -339,16 +365,24 @@ export default function App() {
         if (window.innerWidth <= 760) setSidebar(false);
       },
     })),
-    ...Array.from(new Set(chats.map((chat) => chat.cwd))).map((path) => ({
-      id: `project-${path}`,
-      kind: 'Project',
-      label: path.split('/').filter(Boolean).at(-1) ?? path,
-      detail: path,
-      run: () => {
-        newChat();
-        setCwd(path);
-      },
+    ...sharing.listing.joined.map((joined) => ({
+      id: `shared-${joined.id}`,
+      kind: 'Shared · Joined',
+      label: joined.title,
+      run: () => selectRemote(joined.id),
     })),
+    ...Array.from(new Set(chats.filter((chat) => !chat.shared).map((chat) => chat.cwd))).map(
+      (path) => ({
+        id: `project-${path}`,
+        kind: 'Project',
+        label: path.split('/').filter(Boolean).at(-1) ?? path,
+        detail: path,
+        run: () => {
+          newChat();
+          setCwd(path);
+        },
+      }),
+    ),
     ...(config?.models ?? []).map((item) => ({
       id: `model-${item.key}`,
       kind: 'Model',
@@ -386,34 +420,92 @@ export default function App() {
                 <PanelLeftClose size={18} />
               </button>
             </div>
-            <button className="new-chat" onClick={newChat}>
-              <Plus size={18} />
-              New chat<span>{mac ? '⌘ ⇧ N' : 'Ctrl Shift N'}</span>
-            </button>
-            <button className="browse-pi" onClick={() => setPiSessionsOpen(true)}>
-              <Terminal size={14} />
-              Browse existing Pi sessions
-            </button>
-            <SessionList
-              chats={chats}
-              active={active}
-              running={runningChats}
-              view={sessionList}
-              select={(id) => {
-                selectChat(id);
-                setError('');
-                if (window.innerWidth <= 760) setSidebar(false);
-              }}
-              archive={archive}
-              rename={rename}
-              remove={remove}
-              pin={(chat) => void updateChat(chat, { pinned: !chat.pinned })}
-              folder={(chat) => {
-                const folder = window.prompt('Folder name (empty to remove)', chat.folder ?? '');
-                if (folder !== null) void updateChat(chat, { folder });
-              }}
-            />
-            <InstructionFiles chatId={active} />
+            <div className="sidebar-tabs" role="tablist" aria-label="Conversation types">
+              <button
+                role="tab"
+                aria-selected={sidebarTab === 'chats'}
+                onClick={() => {
+                  setSidebarTab('chats');
+                  setRemote(null);
+                }}
+              >
+                Chats
+              </button>
+              <button
+                role="tab"
+                aria-selected={sidebarTab === 'shared'}
+                onClick={() => setSidebarTab('shared')}
+              >
+                Shared
+              </button>
+            </div>
+            {sidebarTab === 'chats' ? (
+              <>
+                <button className="new-chat" onClick={newChat}>
+                  <Plus size={18} />
+                  New chat<span>{mac ? '⌘ ⇧ N' : 'Ctrl Shift N'}</span>
+                </button>
+                <button className="browse-pi" onClick={() => setPiSessionsOpen(true)}>
+                  <Terminal size={14} />
+                  Browse existing Pi sessions
+                </button>
+                <SessionList
+                  chats={chats.filter((chat) => !chat.shared)}
+                  active={active}
+                  running={runningChats}
+                  view={sessionList}
+                  select={(id) => {
+                    selectChat(id);
+                    setError('');
+                    if (window.innerWidth <= 760) setSidebar(false);
+                  }}
+                  archive={archive}
+                  rename={rename}
+                  remove={remove}
+                  pin={(chat) => void updateChat(chat, { pinned: !chat.pinned })}
+                  folder={(chat) => {
+                    const folder = window.prompt(
+                      'Folder name (empty to remove)',
+                      chat.folder ?? '',
+                    );
+                    if (folder !== null) void updateChat(chat, { folder });
+                  }}
+                />
+              </>
+            ) : (
+              <SharedSidebar
+                listing={sharing.listing}
+                active={active}
+                remote={remote}
+                select={(id) => {
+                  selectChat(id);
+                  setSidebarTab('shared');
+                  if (window.innerWidth <= 760) setSidebar(false);
+                }}
+                selectRemote={selectRemote}
+                created={(chat) => {
+                  setChats((current) => [chat, ...current]);
+                  selectChat(chat.id);
+                  setSidebarTab('shared');
+                  refreshShared();
+                }}
+                changed={refreshShared}
+              />
+            )}
+            {remote && remoteRole ? (
+              <SharedFiles
+                key={`remote:${remote}`}
+                target={{ id: remote, remote: true }}
+                writable={remoteRole === 'writer'}
+              />
+            ) : !remote && currentChat?.shared ? (
+              <SharedFiles
+                key={currentChat.id}
+                target={{ id: currentChat.id, remote: false }}
+                writable
+              />
+            ) : null}
+            {!remote && <InstructionFiles chatId={active} />}
             <div className="sidebar-footer">
               <span className="local-dot" />
               <div>
@@ -442,247 +534,291 @@ export default function App() {
         </>
       )}
       <main className="main-panel">
-        <header className="topbar">
-          <div className="topbar-left">
+        {remote ? (
+          <>
             {!sidebar && (
               <button
-                className="icon-button"
+                className="icon-button shared-mobile-menu"
                 aria-label="Open sidebar"
                 onClick={() => setSidebar(true)}
               >
                 <Menu size={20} />
               </button>
             )}
-            <span className="page-title">{currentChat?.title ?? 'New conversation'}</span>
-            <span className="subtle-pill">Pi agent</span>
-          </div>
-          <button
-            className="workspace-button"
-            onClick={() => setWorkspaceOpen(true)}
-            title={currentChat?.cwd ?? cwd}
-          >
-            <Folder size={14} />
-            <span>
-              {(currentChat?.cwd ?? cwd).split('/').filter(Boolean).at(-1) || 'Workspace'}
-            </span>
-            <ChevronDown size={13} />
-          </button>
-          <button
-            className={`workspace-tools-button ${inspectorOpen ? 'selected' : ''}`}
-            aria-label="Toggle workspace tools"
-            aria-expanded={inspectorOpen}
-            onClick={() => setInspectorOpen(!inspectorOpen)}
-          >
-            <Code2 size={16} />
-            <span>Tools</span>
-          </button>
-        </header>
-        <Updates
-          open={updatesOpen}
-          show={() => setUpdatesOpen(true)}
-          close={() => setUpdatesOpen(false)}
-        />
-        <ConversationActions
-          chat={currentChat}
-          messages={messages}
-          selectedResponses={selectedResponses}
-        />
-        <WorkDock
-          key={active ?? 'new'}
-          snapshot={snapshot}
-          showPlan={preferences.showTaskPlan}
-          queuesEnabled={queuesEnabled}
-          onError={setError}
-        />
-        <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
-        <div
-          className="conversation-scroll"
-          ref={viewportRef}
-          role="region"
-          aria-label="Conversation"
-          tabIndex={0}
-        >
-          <div className="conversation-content" ref={contentRef}>
-            {!messages.length && !loading && !busy ? (
-              <Welcome
-                cwd={currentChat?.cwd ?? cwd}
-                choosePrompt={(text) => {
-                  setDraft(text);
-                  textarea.current?.focus();
-                }}
-                openWorkspace={() => setWorkspaceOpen(true)}
+            <RemoteSharedView
+              key={remote}
+              id={remote}
+              changed={refreshShared}
+              roleChanged={setRemoteRole}
+              networkControl={
+                <NetworkRing
+                  identity={sharing.listing.owner}
+                  changed={refreshShared}
+                  joined={selectRemote}
+                />
+              }
+            />
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar-left">
+                {!sidebar && (
+                  <button
+                    className="icon-button"
+                    aria-label="Open sidebar"
+                    onClick={() => setSidebar(true)}
+                  >
+                    <Menu size={20} />
+                  </button>
+                )}
+                <span className="page-title">{currentChat?.title ?? 'New conversation'}</span>
+                {currentChat?.shared ? (
+                  <span className="subtle-pill" title="Permanently shared session">
+                    <Users size={13} />
+                    Shared · Owner
+                  </span>
+                ) : (
+                  <span className="subtle-pill">Pi agent</span>
+                )}
+              </div>
+              <button
+                className="workspace-button"
+                onClick={() => setWorkspaceOpen(true)}
+                title={currentChat?.cwd ?? cwd}
+              >
+                <Folder size={14} />
+                <span>
+                  {(currentChat?.cwd ?? cwd).split('/').filter(Boolean).at(-1) || 'Workspace'}
+                </span>
+                <ChevronDown size={13} />
+              </button>
+              <NetworkRing
+                identity={sharing.listing.owner}
+                changed={refreshShared}
+                joined={selectRemote}
               />
-            ) : (
-              <section className="transcript" aria-label="Chat messages">
-                {loading && (
-                  <div className="status-line">
-                    <LoaderCircle size={16} className="spin" />
-                    Loading conversation…
+              <button
+                className={`workspace-tools-button ${inspectorOpen ? 'selected' : ''}`}
+                aria-label="Toggle workspace tools"
+                aria-expanded={inspectorOpen}
+                onClick={() => setInspectorOpen(!inspectorOpen)}
+              >
+                <Code2 size={16} />
+                <span>Tools</span>
+              </button>
+            </header>
+            <Updates
+              open={updatesOpen}
+              show={() => setUpdatesOpen(true)}
+              close={() => setUpdatesOpen(false)}
+            />
+            <ConversationActions
+              chat={currentChat}
+              messages={messages}
+              selectedResponses={selectedResponses}
+            />
+            <WorkDock
+              key={active ?? 'new'}
+              snapshot={snapshot}
+              showPlan={preferences.showTaskPlan}
+              queuesEnabled={queuesEnabled}
+              onError={setError}
+            />
+            <TaskPanel key={active ?? 'new'} snapshot={snapshot} onError={setError} />
+            <div
+              className="conversation-scroll"
+              ref={viewportRef}
+              role="region"
+              aria-label="Conversation"
+              tabIndex={0}
+            >
+              <div className="conversation-content" ref={contentRef}>
+                {!messages.length && !loading && !busy ? (
+                  <Welcome
+                    cwd={currentChat?.cwd ?? cwd}
+                    choosePrompt={(text) => {
+                      setDraft(text);
+                      textarea.current?.focus();
+                    }}
+                    openWorkspace={() => setWorkspaceOpen(true)}
+                  />
+                ) : (
+                  <section className="transcript" aria-label="Chat messages">
+                    {loading && (
+                      <div className="status-line">
+                        <LoaderCircle size={16} className="spin" />
+                        Loading conversation…
+                      </div>
+                    )}
+                    {messages.map((message, index) => (
+                      <MessageView
+                        key={index}
+                        message={message}
+                        selected={selectedResponses.includes(index)}
+                        toggleSelected={() =>
+                          setSelectedResponses((current) =>
+                            current.includes(index)
+                              ? current.filter((value) => value !== index)
+                              : [...current, index],
+                          )
+                        }
+                      />
+                    ))}
+                    <ThinkingPanel snapshot={snapshot} />
+                  </section>
+                )}
+                {latestCommand && (
+                  <div className="web-command-result" role="status" key={latestCommand.id}>
+                    <strong>{latestCommand.label}</strong>
+                    <p>{latestCommand.detail}</p>
                   </div>
                 )}
-                {messages.map((message, index) => (
-                  <MessageView
-                    key={index}
-                    message={message}
-                    selected={selectedResponses.includes(index)}
-                    toggleSelected={() =>
-                      setSelectedResponses((current) =>
-                        current.includes(index)
-                          ? current.filter((value) => value !== index)
-                          : [...current, index],
-                      )
-                    }
-                  />
-                ))}
-                <ThinkingPanel snapshot={snapshot} />
-              </section>
-            )}
-            {latestCommand && (
-              <div className="web-command-result" role="status" key={latestCommand.id}>
-                <strong>{latestCommand.label}</strong>
-                <p>{latestCommand.detail}</p>
+                <Subagents snapshot={snapshot} />
+              </div>
+            </div>
+            {paused && (
+              <div className="latest-message-bar">
+                <button className="secondary-button" onClick={scrollToLatest}>
+                  {hasNewReply ? 'New reply · ' : ''}Jump to latest ↓
+                </button>
               </div>
             )}
-            <Subagents snapshot={snapshot} />
-          </div>
-        </div>
-        {paused && (
-          <div className="latest-message-bar">
-            <button className="secondary-button" onClick={scrollToLatest}>
-              {hasNewReply ? 'New reply · ' : ''}Jump to latest ↓
-            </button>
-          </div>
-        )}
-        <div className="composer-area">
-          {(error || snapshot?.error) && (
-            <div className="error-banner" role="alert">
-              {error || snapshot?.error}
-              <button
-                className="icon-button"
-                aria-label="Dismiss error"
-                onClick={() => {
-                  setError('');
-                  setSnapshot((s) => (s ? { ...s, error: undefined } : s));
-                }}
+            <div className="composer-area">
+              {(error || snapshot?.error) && (
+                <div className="error-banner" role="alert">
+                  {error || snapshot?.error}
+                  <button
+                    className="icon-button"
+                    aria-label="Dismiss error"
+                    onClick={() => {
+                      setError('');
+                      setSnapshot((s) => (s ? { ...s, error: undefined } : s));
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {active && !connected && (
+                <div className="connection-notice" role="status">
+                  Connecting to your session… If the server stopped, restart it with npm run dev.
+                </div>
+              )}
+              {soundNotice && (
+                <div className="sound-notice" role="status">
+                  <span>{soundNotice}</span>
+                  <button onClick={() => setSettingsOpen(true)}>Audio settings</button>
+                  <button
+                    className="icon-button"
+                    aria-label="Dismiss audio notice"
+                    onClick={() => setSoundNotice('')}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+              <form
+                className={`composer ${busy ? 'composer-working' : ''}`}
+                aria-label="Message composer"
+                aria-busy={busy}
+                onSubmit={(e) => void send(e)}
               >
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          {active && !connected && (
-            <div className="connection-notice" role="status">
-              Connecting to your session… If the server stopped, restart it with npm run dev.
-            </div>
-          )}
-          {soundNotice && (
-            <div className="sound-notice" role="status">
-              <span>{soundNotice}</span>
-              <button onClick={() => setSettingsOpen(true)}>Audio settings</button>
-              <button
-                className="icon-button"
-                aria-label="Dismiss audio notice"
-                onClick={() => setSoundNotice('')}
-              >
-                <X size={13} />
-              </button>
-            </div>
-          )}
-          <form
-            className={`composer ${busy ? 'composer-working' : ''}`}
-            aria-label="Message composer"
-            aria-busy={busy}
-            onSubmit={(e) => void send(e)}
-          >
-            <span className="sr-only" role="status">
-              {busy ? 'Pi is working.' : ''}
-            </span>
-            <textarea
-              ref={textarea}
-              aria-label="Message Pi"
-              placeholder={
-                snapshot?.busy
-                  ? queuesEnabled
-                    ? 'Write your next prompt — it will be queued…'
-                    : 'Pi is working — draft your next message…'
-                  : 'Ask Pi anything, or describe what you want to build…'
-              }
-              rows={2}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
-            />
-            <div className="composer-toolbar">
-              <div className="model-picker">
-                <Sparkles size={14} />
-                <select
-                  aria-label="Model"
-                  value={selectedModel}
-                  disabled={busy || !config}
-                  onChange={(e) => setModel(e.target.value)}
-                >
-                  <option value="">Pi default model</option>
-                  {config?.models.map((m) => (
-                    <option value={m.key} key={m.key}>
-                      {m.name} · {m.provider}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={12} />
-              </div>
-              <div className="composer-right">
-                <span className="enter-hint">
-                  {snapshot?.busy
-                    ? queuesEnabled
-                      ? '↵ to queue'
-                      : 'Wait for the current reply'
-                    : '↵ to send'}{' '}
-                  · ⇧ ↵ newline
+                <span className="sr-only" role="status">
+                  {busy ? 'Pi is working.' : ''}
                 </span>
-                {queuesEnabled && busy && !!draft.trim() && (
-                  <button
-                    type="submit"
-                    className="queue-send"
-                    aria-label="Queue prompt"
-                    disabled={sending || !connected}
-                  >
-                    Queue <Plus size={13} />
-                  </button>
-                )}
-                {busy ? (
-                  <button
-                    type="button"
-                    className="send-button stop-button"
-                    aria-label="Stop response"
-                    onClick={stopResponse}
-                  >
-                    <Square size={16} fill="currentColor" />
-                  </button>
-                ) : (
-                  <button
-                    className="send-button"
-                    type="submit"
-                    aria-label="Send message"
-                    disabled={!draft.trim() || !config || loading || (!!active && !connected)}
-                  >
-                    <ArrowUp size={20} />
-                  </button>
-                )}
+                <textarea
+                  ref={textarea}
+                  aria-label="Message Pi"
+                  placeholder={
+                    snapshot?.busy
+                      ? queuesEnabled
+                        ? 'Write your next prompt — it will be queued…'
+                        : 'Pi is working — draft your next message…'
+                      : 'Ask Pi anything, or describe what you want to build…'
+                  }
+                  rows={2}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                />
+                <div className="composer-toolbar">
+                  <div className="model-picker">
+                    <Sparkles size={14} />
+                    <select
+                      aria-label="Model"
+                      value={selectedModel}
+                      disabled={busy || !config}
+                      onChange={(e) => setModel(e.target.value)}
+                    >
+                      <option value="">Pi default model</option>
+                      {config?.models.map((m) => (
+                        <option value={m.key} key={m.key}>
+                          {m.name} · {m.provider}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={12} />
+                  </div>
+                  <div className="composer-right">
+                    <span className="enter-hint">
+                      {snapshot?.busy
+                        ? queuesEnabled
+                          ? '↵ to queue'
+                          : 'Wait for the current reply'
+                        : '↵ to send'}{' '}
+                      · ⇧ ↵ newline
+                    </span>
+                    {queuesEnabled && busy && !!draft.trim() && (
+                      <button
+                        type="submit"
+                        className="queue-send"
+                        aria-label="Queue prompt"
+                        disabled={sending || !connected}
+                      >
+                        Queue <Plus size={13} />
+                      </button>
+                    )}
+                    {busy ? (
+                      <button
+                        type="button"
+                        className="send-button stop-button"
+                        aria-label="Stop response"
+                        onClick={stopResponse}
+                      >
+                        <Square size={16} fill="currentColor" />
+                      </button>
+                    ) : (
+                      <button
+                        className="send-button"
+                        type="submit"
+                        aria-label="Send message"
+                        disabled={!draft.trim() || !config || loading || (!!active && !connected)}
+                      >
+                        <ArrowUp size={20} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </form>
+              <div className="composer-bottom">
+                <ContextMeter snapshot={snapshot} />
+                <p className="composer-disclaimer">
+                  Pi can edit files and run commands. Review important changes.
+                </p>
               </div>
             </div>
-          </form>
-          <div className="composer-bottom">
-            <ContextMeter snapshot={snapshot} />
-            <p className="composer-disclaimer">
-              Pi can edit files and run commands. Review important changes.
-            </p>
-          </div>
-        </div>
+          </>
+        )}
       </main>
+      {sharing.loaded && !sharing.listing.owner.name && (
+        <IdentitySetup identity={sharing.listing.owner} saved={refreshShared} />
+      )}
       {inspectorOpen && (
         <Inspector
           chatId={active}

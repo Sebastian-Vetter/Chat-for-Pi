@@ -1,0 +1,305 @@
+.sidebar-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+}
+.sidebar-tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #7e8f76;
+  padding: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.sidebar-tabs button[aria-selected='true'] {
+  color: #c5daba;
+  background: #ffffff08;
+}
+.network-ring {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #99a891;
+}
+.shared-dialog {
+  width: min(620px, calc(100vw - 28px));
+  max-height: 85dvh;
+  overflow: auto;
+}
+.shared-dialog h2 {
+  font-size: 18px;
+}
+.shared-dialog h3 {
+  font-size: 12px;
+  margin-top: 22px;
+}
+.shared-dialog p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #8e9d87;
+}
+.shared-dialog label:not(.shared-consent) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.shared-dialog input:not([type='checkbox']),
+.shared-dialog select,
+.shared-remote-composer textarea {
+  background: #151b15;
+  border: 1px solid #b5d7a52b;
+  border-radius: 6px;
+  color: #d6dfd2;
+  padding: 9px;
+  font: inherit;
+  min-width: 0;
+}
+.shared-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.shared-actions .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.shared-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 16px 0;
+}
+.shared-consent input {
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+.shared-id {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  color: #78886f;
+  margin: 8px 0;
+}
+.shared-error {
+  color: #e3b5a5;
+  font-size: 12px;
+  margin: 10px 14px;
+  overflow-wrap: anywhere;
+}
+.shared-session-list {
+  flex: 1;
+  min-height: 40px;
+  overflow: auto;
+  scrollbar-width: thin;
+  padding: 4px 7px;
+}
+.shared-session-list > p {
+  padding: 8px;
+  color: #78886f;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.shared-session-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.shared-session-row > button:first-child {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #b8c7ad;
+  text-align: left;
+  padding: 9px 7px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.shared-session-row > button:first-child.selected {
+  background: #ffffff08;
+}
+.shared-session-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.shared-session-row svg {
+  flex-shrink: 0;
+}
+.shared-session-row small,
+.network-peers small {
+  display: block;
+  color: #7b8e71;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.shared-member {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.shared-member span,
+.network-peers span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.network-peers > div {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.shared-files {
+  flex-shrink: 0;
+  margin: 6px 10px;
+  padding-top: 6px;
+  border-top: 1px solid #ffffff09;
+  max-height: 35dvh;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.shared-files-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 2px;
+  font-size: 11px;
+  color: #9caf91;
+  cursor: pointer;
+}
+.shared-files-toggle span {
+  margin-left: auto;
+}
+.shared-file-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.shared-file-tools > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #8e9d87;
+}
+.shared-file-list {
+  max-height: 22dvh;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.shared-file-list > button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 4px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: #a1b396;
+  font-size: 11px;
+}
+.shared-file-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shared-file-list p {
+  font-size: 10px;
+  color: #78886f;
+}
+.shared-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  position: relative;
+  cursor: pointer;
+}
+.shared-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.shared-editor {
+  width: min(900px, calc(100vw - 28px));
+  max-height: 85dvh;
+  overflow: auto;
+}
+.shared-editor h2 {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.shared-editor textarea {
+  width: 100%;
+  min-height: 40dvh;
+  background: #111810;
+  color: #d6dfd2;
+  border: 1px solid #b5d7a52b;
+  border-radius: 6px;
+  padding: 12px;
+  resize: vertical;
+  font: 12px/1.6 monospace;
+}
+.shared-owner {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  color: #8e9d87;
+  margin: 8px 18px;
+}
+.shared-remote-transcript {
+  flex: 1;
+  min-height: 0;
+}
+.shared-remote-composer {
+  margin: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.shared-remote-composer textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+}
+.shared-remote-composer small {
+  font-size: 10px;
+  color: #78886f;
+}
+.shared-mobile-menu {
+  align-self: flex-start;
+  margin: 4px 8px;
+}
+@media (pointer: coarse) {
+  .network-ring,
+  .shared-file-tools .icon-button,
+  .shared-upload {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .sidebar-tabs button,
+  .shared-file-list > button {
+    min-height: 44px;
+  }
+}

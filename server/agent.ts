@@ -68,6 +68,7 @@ export class AgentService {
   private closing = false;
   readonly queues: PromptQueues;
   readonly settings: AppSettings;
+  sharedWriterAllowed?: (id: string, actorId: string, grant?: string) => boolean;
   private subagents: Subagents;
   readonly approvals: Approvals;
   constructor(
@@ -124,11 +125,11 @@ export class AgentService {
     if (enabled) this.settings.update(true);
     return this.settings.read();
   }
-  enqueue(record: ChatRecord, text: string, model?: string) {
+  enqueue(record: ChatRecord, text: string, model?: string, actorId?: string, actorGrant?: string) {
     if (!this.settings.read().queuesEnabled)
       throw new Error('Prompt queues are disabled. Enable them in Settings first.');
     if (this.closing) throw new Error('Server is shutting down');
-    this.queues.add(record.id, text, model);
+    this.queues.add(record.id, text, model, actorId, actorGrant);
     this.publish(record);
     this.drain(record);
   }
@@ -149,6 +150,12 @@ export class AgentService {
       return;
     const next = this.queues.take(record.id);
     if (!next) return;
+    if (next.actorId && !this.sharedWriterAllowed?.(record.id, next.actorId, next.actorGrant)) {
+      this.queues.complete(record.id);
+      this.publish(record);
+      this.drain(record);
+      return;
+    }
     void this.prompt(record, next.text, next.model)
       .finally(() => {
         this.queues.complete(record.id);

@@ -15,6 +15,7 @@ export interface ChatRecord {
   updatedAt: string;
   sessionFile?: string;
   archived?: boolean;
+  shared?: boolean;
   pinned?: boolean;
   folder?: string;
   approvalMode?: boolean;
@@ -38,10 +39,11 @@ export class ChatStore {
   get(id: string) {
     return this.records.find((record) => record.id === id);
   }
-  create(cwd: string) {
+  create(cwd: string, shared = false) {
     const now = new Date().toISOString();
     const record: ChatRecord = {
       id: randomUUID(),
+      ...(shared ? { shared: true } : {}),
       title: 'New chat',
       cwd,
       createdAt: now,
