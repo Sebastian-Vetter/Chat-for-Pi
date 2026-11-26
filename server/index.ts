@@ -11,12 +11,17 @@ import { PiSessions } from './pi-sessions.js';
 import { UpdateChecker } from '../scripts/updates.ts';
 import { UsageLimitChecker, USAGE_PROVIDERS } from './usage-limits.js';
 import { editPlan, PlanEditError } from './plans.js';
+import { SharedService } from './shared.js';
+import { SharedNetwork } from './shared-network.js';
+import { sharedRoutes } from './shared-routes.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 const dataDir = resolve(process.env.CHAT_DATA_DIR ?? '.data');
 const store = new ChatStore(dataDir);
 const agents = new AgentService(store);
+const shared = new SharedService(store, agents);
+const sharedNetwork = new SharedNetwork(shared);
 const pipelines = new PipelineService(
   agents.activity,
   (record) => agents.publish(record),
@@ -65,7 +70,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+app.use('/api/shared', express.json({ limit: '12mb', inflate: false }));
 app.use(express.json({ limit: '1mb' }));
+app.use('/api/shared', sharedRoutes(shared, sharedNetwork));
 app.get('/api/health', (_req, res) =>
   res.json({ app: 'pi-chat', pid: process.pid, serviceId: process.env.CHAT_SERVICE_ID ?? null }),
 );
@@ -124,9 +131,14 @@ app.get('/api/pi-sessions', async (req, res) =>
 app.get('/api/pi-sessions/:key', async (req, res) =>
   res.json(await piSessions.preview(req.params.key)),
 );
-app.post('/api/pi-sessions/:key/import', async (req, res) =>
-  res.status(201).json(await piSessions.import(req.params.key)),
-);
+app.post('/api/pi-sessions/:key/import', async (req, res) => {
+  const preview = await piSessions.preview(req.params.key);
+  if (shared.protectedFolder(await realpath(preview.cwd))) {
+    res.status(409).json({ error: 'This folder belongs to a shared session; use Shared instead' });
+    return;
+  }
+  res.status(201).json(await piSessions.import(req.params.key));
+});
 app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -157,6 +169,10 @@ app.post('/api/chats', async (req, res) => {
     if (!(await stat(cwd)).isDirectory()) throw new Error();
   } catch {
     res.status(400).json({ error: 'Working directory does not exist or is not accessible' });
+    return;
+  }
+  if (shared.protectedFolder(cwd)) {
+    res.status(409).json({ error: 'This folder belongs to a shared session; use Shared instead' });
     return;
   }
   res.status(201).json(store.create(cwd));
@@ -358,9 +374,10 @@ app.post('/api/chats/:id/messages', (req, res) => {
     res.status(400).json({ error: 'Message must contain 1–100,000 characters' });
     return;
   }
+  const submittedText = record.shared ? shared.ownerText(text.trim()) : text.trim();
   if (req.body.enqueue === true) {
     try {
-      agents.enqueue(record, text.trim(), model);
+      agents.enqueue(record, submittedText, model);
       res.status(202).json({ ok: true, queued: true });
     } catch (error) {
       res.status(409).json({ error: (error as Error).message });
@@ -377,7 +394,7 @@ app.post('/api/chats/:id/messages', (req, res) => {
   }
   // Running state is set synchronously before acknowledging the request.
   void agents
-    .prompt(record, text.trim(), model)
+    .prompt(record, submittedText, model)
     .catch((error) => console.error('Agent failure:', error));
   res.status(202).json({ ok: true });
 });
@@ -423,7 +440,7 @@ async function shutdown() {
   if (closing) return;
   closing = true;
   server.close();
-  await Promise.all([agents.shutdown(), pipelines.shutdown()]);
+  await Promise.all([sharedNetwork.stop(), agents.shutdown(), pipelines.shutdown()]);
   server.closeAllConnections();
   process.exit(0);
 }

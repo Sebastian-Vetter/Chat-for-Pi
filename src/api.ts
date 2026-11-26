@@ -1,4 +1,5 @@
 export interface Chat {
+  shared?: boolean;
   archived?: boolean;
   pinned?: boolean;
   folder?: string;

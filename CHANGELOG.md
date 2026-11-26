@@ -4,6 +4,24 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-26
+
+### Added
+
+- Opt-in LAN Live Share with persistent installation UUID/signing keys and required, editable display names. Dedicated shared sessions use a new or verified-empty owner-hosted project folder and remain permanently distinguishable from private chats.
+- Separate, role-scoped HTTPS gateway with owner-signed certificate-pinned invitations, signed installation requests, replay protection, revocation and bounded requests; private APIs remain loopback-only. Quiet network-ring discovery, Chats/Shared sidebar tabs, owner access controls and reader/writer views.
+- Shared sidebar files with read/download, writer upload/create/edit/delete, 8 MiB limits, content-hash conflict checks and traversal/symlink rejection. Explicit writer-trust consent documents that agent tools are not sandboxed.
+- Attributed writer prompts obey existing sequential queues and installation-wide queue policy. Queued writer authorization is rechecked, including permission-generation changes, before execution. Sharing off revokes invitations and remote credentials without stopping already accepted work.
+
+### Security and limitations
+
+- Discovery broadcasts names/session titles only after explicit LAN enablement and never authenticates access. Owner management, private chats, approval decisions and general filesystem APIs are not exposed remotely. Remote Markdown images do not automatically fetch external resources.
+- Initial LAN support uses private IPv4 and OpenSSL-generated TLS certificates; networking stays off after restart. Remote snapshots are explicitly bounded to the latest 100 messages and 20,000 characters per message, with full history retained by the owner. Live updates use polling; no automatic project replication or internet sharing.
+
+### Tests
+
+- Added identity persistence, empty/hidden-folder checks, reader/writer enforcement, signature/replay rejection, queued-role revocation, sharing-off invalidation, confined file edits and real pinned-TLS gateway tests without providers. Desktop/mobile browser coverage exercises onboarding, permanent shared identity, project files, opt-in networking and revoked participant controls.
+
 ## [1.1.5] - 2026-11-26
 
 ### Added

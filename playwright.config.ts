@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 import { resolve } from 'node:path';
 export default defineConfig({
   testDir: './tests',
+  globalSetup: './tests/setup.ts',
   // Bound Chromium instances for reliable release checks on developer laptops and CI.
   workers: 2,
   use: {
