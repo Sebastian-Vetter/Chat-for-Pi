@@ -4,6 +4,17 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-11-26
+
+### Fixed
+
+- Conversations now open at the latest content and keep following streamed replies, activity-only runs, delayed image/font layout changes, and viewport resizing. Layout-generated scroll events no longer accidentally disable automatic following.
+- Scrolling upward with the wheel, touch, keyboard, or scrollbar pauses automatic following so older messages remain readable. Returning to the bottom resumes following; opening another conversation or sending a message returns to the latest content.
+
+### Tests
+
+- Added desktop/mobile browser regression coverage for initial opening, reloads, conversation switching, streaming, delayed images, resizing, upward-scroll intent, and resuming automatic following. Tests use simulated conversation events without live-provider calls.
+
 ## [1.0.6] - 2026-11-25
 
 ### Changed

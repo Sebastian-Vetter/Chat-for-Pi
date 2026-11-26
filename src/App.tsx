@@ -19,6 +19,7 @@ import MessageView from './MessageView';
 import WorkspaceDialog from './WorkspaceDialog';
 import Welcome from './Welcome';
 import SessionList, { useSessionList } from './SessionList';
+import { useConversationScroll } from './useConversationScroll';
 import InstructionFiles from './Instructions';
 import Inspector from './Inspector';
 import SettingsDialog, { readPreferences, playFinishSound, unlockSound } from './Preferences';
@@ -62,9 +63,8 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(!!active);
-  const scroll = useRef<HTMLDivElement>(null);
+  const { viewportRef, contentRef, scrollToLatest } = useConversationScroll(active);
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const follow = useRef(true);
   const submitting = useRef(false);
   const busy = !!snapshot?.busy || sending;
   async function refreshChats() {
@@ -138,7 +138,6 @@ export default function App() {
     setSnapshot(undefined);
     setConnected(false);
     setLoading(!!active);
-    follow.current = true;
     if (!active) {
       localStorage.removeItem('pi-chat-active');
       return;
@@ -162,16 +161,13 @@ export default function App() {
     return () => source.close();
   }, [active]);
   useEffect(() => {
-    if (snapshot?.messages.length && follow.current && scroll.current)
-      scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [snapshot, sending]);
-  useEffect(() => {
     if (textarea.current) {
       textarea.current.style.height = 'auto';
       textarea.current.style.height = `${Math.min(textarea.current.scrollHeight, 180)}px`;
     }
   }, [draft]);
   function selectChat(id: string | null) {
+    scrollToLatest();
     drafts.current[active ?? 'new'] = draft;
     setActive(id);
     setDraft(drafts.current[id ?? 'new'] ?? '');
@@ -213,7 +209,7 @@ export default function App() {
     submitting.current = true;
     setSending(true);
     setError('');
-    follow.current = true;
+    scrollToLatest();
     const text = draft;
     try {
       let id = active;
@@ -407,42 +403,43 @@ export default function App() {
         <PromptQueue snapshot={snapshot} onError={setError} />
         <div
           className="conversation-scroll"
-          ref={scroll}
-          onScroll={() => {
-            const el = scroll.current;
-            if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-          }}
+          ref={viewportRef}
+          role="region"
+          aria-label="Conversation"
+          tabIndex={0}
         >
-          {!messages.length && !loading && !busy ? (
-            <Welcome
-              cwd={currentChat?.cwd ?? cwd}
-              choosePrompt={(text) => {
-                setDraft(text);
-                textarea.current?.focus();
-              }}
-              openWorkspace={() => setWorkspaceOpen(true)}
-            />
-          ) : (
-            <section className="transcript" aria-label="Chat messages">
-              {loading && (
-                <div className="status-line">
-                  <LoaderCircle size={16} className="spin" />
-                  Loading conversation…
-                </div>
-              )}
-              {messages.map((message, index) => (
-                <MessageView key={index} message={message} />
-              ))}
-              <ThinkingPanel snapshot={snapshot} />
-            </section>
-          )}
-          {latestCommand && (
-            <div className="web-command-result" role="status" key={latestCommand.id}>
-              <strong>{latestCommand.label}</strong>
-              <p>{latestCommand.detail}</p>
-            </div>
-          )}
-          <Subagents snapshot={snapshot} />
+          <div className="conversation-content" ref={contentRef}>
+            {!messages.length && !loading && !busy ? (
+              <Welcome
+                cwd={currentChat?.cwd ?? cwd}
+                choosePrompt={(text) => {
+                  setDraft(text);
+                  textarea.current?.focus();
+                }}
+                openWorkspace={() => setWorkspaceOpen(true)}
+              />
+            ) : (
+              <section className="transcript" aria-label="Chat messages">
+                {loading && (
+                  <div className="status-line">
+                    <LoaderCircle size={16} className="spin" />
+                    Loading conversation…
+                  </div>
+                )}
+                {messages.map((message, index) => (
+                  <MessageView key={index} message={message} />
+                ))}
+                <ThinkingPanel snapshot={snapshot} />
+              </section>
+            )}
+            {latestCommand && (
+              <div className="web-command-result" role="status" key={latestCommand.id}>
+                <strong>{latestCommand.label}</strong>
+                <p>{latestCommand.detail}</p>
+              </div>
+            )}
+            <Subagents snapshot={snapshot} />
+          </div>
         </div>
         <div className="composer-area">
           {(error || snapshot?.error) && (

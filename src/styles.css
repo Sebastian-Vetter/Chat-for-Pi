@@ -344,6 +344,11 @@ a {
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: #444a43 transparent;
+  overflow-anchor: none;
+  scroll-behavior: auto;
+}
+.conversation-content {
+  display: flow-root;
 }
 .welcome {
   max-width: 790px;
