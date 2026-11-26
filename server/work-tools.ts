@@ -8,6 +8,7 @@ import {
 import { Type, type TSchema, type Static } from 'typebox';
 import type { ChatRecord, ChatStore } from './store.js';
 import type { Approvals } from './approvals.js';
+import { assertPlanRevision } from './plans.js';
 
 export function approvedTools(record: ChatRecord, approvals: Approvals) {
   function gate<T extends TSchema, D>(tool: ToolDefinition<T, D>): ToolDefinition {
@@ -50,6 +51,13 @@ export function approvedTools(record: ChatRecord, approvals: Approvals) {
 }
 
 const planParameters = Type.Object({
+  revision: Type.Optional(
+    Type.Integer({
+      minimum: 0,
+      description:
+        'Current revision returned when reading the plan; required to replace an existing plan.',
+    }),
+  ),
   steps: Type.Optional(
     Type.Array(
       Type.Object({
@@ -75,15 +83,19 @@ export function planTool(
     label: 'Task plan',
     parameters: planParameters,
     description:
-      'Read or publish a short, user-visible task checklist. Omit steps to read the current plan. Supply steps to replace it with concise pending/running/done steps. Report actions and outcomes only, never private reasoning.',
+      'Read or publish a short, user-visible task checklist. Omit steps to read the current steps and revision. To replace an existing plan, supply steps and that exact revision. On a revision conflict, reread and preserve user-added tasks and ordering. Report actions and outcomes only, never private reasoning.',
     promptSnippet: 'Publish task steps and observable progress',
     promptGuidelines: [
-      'Read the current plan with update_plan before multi-step coding work, then publish and update task statuses as work progresses. Do not put private reasoning in update_plan.',
+      'Read the current plan with update_plan before multi-step coding work. Include its revision when updating statuses, preserve user-added pending tasks and ordering, and reread after any conflict. Do not put private reasoning in update_plan.',
     ],
     executionMode: 'sequential',
-    async execute(_id, { steps }, signal) {
+    async execute(_id, { steps, revision }, signal) {
       if (signal?.aborted) throw new Error('Task stopped');
       if (steps) {
+        assertPlanRevision(
+          record.planRevision ?? 0,
+          revision ?? (record.planRevision ? undefined : 0),
+        );
         if (steps.some((step) => !step.text.trim()))
           throw new Error('Plan steps must not be blank');
         store.update(record.id, {
@@ -91,10 +103,10 @@ export function planTool(
         });
         publish();
       }
-      const current = record.plan ?? [];
+      const current = { steps: record.plan ?? [], revision: record.planRevision ?? 0 };
       return {
         content: [{ type: 'text', text: JSON.stringify(current) }],
-        details: { steps: current },
+        details: current,
       };
     },
   };

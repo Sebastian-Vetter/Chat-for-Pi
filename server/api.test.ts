@@ -133,6 +133,76 @@ test('local API validates requests and persists a chat lifecycle', { timeout: 45
     assert.equal(organized.chat.folder, 'Project A');
     assert.equal(organized.chat.approvalMode, true);
     assert.deepEqual(organized.chat.plan, [{ text: 'Run tests', status: 'pending' }]);
+    assert.equal(organized.chat.planRevision, 1);
+    assert.equal(
+      (
+        await request(`/chats/${chat.id}/plan`, 'PATCH', {
+          revision: 1,
+          action: 'add',
+          text: 'Follow-up',
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (
+        await request(`/chats/${chat.id}/plan`, 'PATCH', {
+          revision: 1,
+          action: 'add',
+          text: 'Stale follow-up',
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (
+        await request(`/chats/${chat.id}/plan`, 'PATCH', {
+          action: 'move',
+          index: 0,
+          targetIndex: 1,
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await request(`/chats/${chat.id}/plan`, 'PATCH', {
+          revision: 2,
+          action: 'status',
+          index: 0,
+          status: 'running',
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (
+        await request(`/chats/${chat.id}/plan`, 'PATCH', {
+          revision: 3,
+          action: 'move',
+          index: 0,
+          targetIndex: 1,
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (
+        await request(
+          `/chats/${chat.id}/plan`,
+          'PATCH',
+          { revision: 3, action: 'add', text: 'Cross origin' },
+          { Origin: 'https://evil.example' },
+        )
+      ).status,
+      403,
+    );
+    const finalPlan = await (await request(`/chats/${chat.id}`)).json();
+    assert.deepEqual(finalPlan.chat.plan, [
+      { text: 'Run tests', status: 'running' },
+      { text: 'Follow-up', status: 'pending' },
+    ]);
+    assert.equal(finalPlan.chat.planRevision, 3);
     assert.equal(
       (await request(`/chats/${chat.id}/approvals/nonexistent`, 'POST', { approved: true })).status,
       404,

@@ -195,7 +195,7 @@ test('task plans are explicit persistent public steps and can be read without re
     await assert.rejects(
       tool.execute(
         'blank',
-        { steps: [{ text: ' ', status: 'pending' }] },
+        { revision: 1, steps: [{ text: ' ', status: 'pending' }] },
         undefined,
         undefined,
         context,

@@ -75,10 +75,41 @@
   gap: 7px;
   margin: 8px 0;
 }
-.task-plan li > span:nth-child(2) {
+.task-plan .plan-step-text {
   flex: 1;
   min-width: 100px;
   overflow-wrap: anywhere;
+}
+.plan-move-controls {
+  display: flex;
+  gap: 4px;
+}
+.task-plan .plan-drag-handle {
+  cursor: grab;
+}
+.task-plan .plan-drag-handle:active {
+  cursor: grabbing;
+}
+.task-plan .plan-drag-handle,
+.plan-move-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+}
+.task-plan .plan-drop-target {
+  outline: 2px dashed #b5d7a5;
+  outline-offset: 3px;
+  background: #b5d7a510;
+}
+.plan-edit-notice {
+  font-size: 11px;
+  color: #aabf9f;
+  line-height: 1.5;
+}
+.plan-edit-notice:not(:empty) {
+  margin-top: 8px;
 }
 .plan-status {
   font-size: 10px;
@@ -248,6 +279,11 @@
   outline-offset: -2px;
 }
 @media (max-width: 760px) {
+  .task-plan .plan-drag-handle,
+  .plan-move-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
   .conversation-actions {
     padding: 7px 10px;
     gap: 6px;

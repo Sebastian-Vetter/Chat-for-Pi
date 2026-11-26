@@ -4,6 +4,17 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-26
+
+### Added
+
+- Drag-and-drop grips and accessible up/down buttons reorder pending task-plan steps, including while Pi or configured tests are active. Running and completed steps keep their exact positions. Pending steps can also be added during active work; status changes/removal remain idle-only, and the plan does not start or enqueue prompts.
+- Persisted plan revisions protect browser edits and model updates from overwriting newer changes. Stale operations fail with a review/retry message, live changes cancel an in-progress drag, and Pi must reread the current revision before replacing an existing plan. Reordering preserves unsent step text and keyboard focus.
+
+### Tests
+
+- Added plan operation, revision persistence, and stale-model-update tests plus API validation/origin checks. Desktop/mobile browser tests cover real pending work, native dragging, keyboard/button movement, fixed running/done positions, draft preservation, reloads, concurrent tabs, and mid-drag updates without provider calls.
+
 ## [1.1.0] - 2026-11-26
 
 ### Added

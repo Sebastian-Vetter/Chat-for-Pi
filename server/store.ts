@@ -19,6 +19,7 @@ export interface ChatRecord {
   folder?: string;
   approvalMode?: boolean;
   plan?: PlanStep[];
+  planRevision?: number;
   subagentsEnabled?: boolean;
   contextUsage?: { tokens: number | null; contextWindow: number; percent: number | null };
   modelName?: string;
@@ -70,7 +71,13 @@ export class ChatStore {
   ) {
     const record = this.get(id);
     if (!record) throw new Error('Chat not found');
-    Object.assign(record, values, { updatedAt: new Date().toISOString() });
+    const planRevision = Object.hasOwn(values, 'plan')
+      ? (record.planRevision ?? 0) + 1
+      : record.planRevision;
+    Object.assign(record, values, {
+      ...(planRevision !== undefined ? { planRevision } : {}),
+      updatedAt: new Date().toISOString(),
+    });
     this.save();
     return record;
   }

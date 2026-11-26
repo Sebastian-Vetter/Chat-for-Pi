@@ -10,6 +10,7 @@ import { discoverTasks, PipelineService } from './pipelines.js';
 import { PiSessions } from './pi-sessions.js';
 import { UpdateChecker } from '../scripts/updates.ts';
 import { UsageLimitChecker, USAGE_PROVIDERS } from './usage-limits.js';
+import { editPlan, PlanEditError } from './plans.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -206,6 +207,23 @@ app.post('/api/chats/:id/approvals/:approvalId', (req, res) => {
     return;
   }
   res.json({ ok: true });
+});
+app.patch('/api/chats/:id/plan', (req, res) => {
+  const record = store.get(req.params.id)!;
+  try {
+    const plan = editPlan(
+      record.plan ?? [],
+      record.planRevision ?? 0,
+      req.body,
+      agents.busy(record.id) || pipelines.busy(record.id),
+    );
+    const updated = store.update(record.id, { plan });
+    agents.publish(updated);
+    res.json(updated);
+  } catch (error) {
+    if (!(error instanceof PlanEditError)) throw error;
+    res.status(error.status).json({ error: error.message });
+  }
 });
 app.patch('/api/chats/:id', (req, res) => {
   const body = req.body ?? {};

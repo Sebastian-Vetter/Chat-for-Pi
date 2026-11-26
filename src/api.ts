@@ -4,6 +4,7 @@ export interface Chat {
   folder?: string;
   approvalMode?: boolean;
   plan?: { text: string; status: 'pending' | 'running' | 'done' }[];
+  planRevision?: number;
   subagentsEnabled?: boolean;
   id: string;
   title: string;

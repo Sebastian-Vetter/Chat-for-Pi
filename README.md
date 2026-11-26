@@ -248,7 +248,9 @@ Scrolling upward pauses automatic following and reveals **Jump to latest** above
 
 Use a conversation's **Pin** action to keep it above recent chats. **Move to folder** assigns a custom folder name; an empty name removes it. **Group sessions** switches between Recent, By project (working-directory path), and By folder. Pins and folders are stored with the chat; grouping preferences stay in this browser. Archived chats retain their organization.
 
-**Task plan** shows explicit pending/running/done steps, not private model reasoning. Expand it to add steps or cycle their status while the chat is idle. Pi has an `update_plan` tool to read and publish this public checklist during multi-step work. Unfinished steps are not automatically marked done when a run stops.
+**Task plan** shows explicit pending/running/done steps, not private model reasoning. Add pending steps even while Pi is working. Drag a pending step by its grip onto another pending step, or use its up/down buttons on a keyboard or phone. Only pending slots are reordered: running and completed steps stay at their exact positions. Status changes and removal still require idle work. Draft text is preserved when reordering.
+
+Plan edits are persisted and protected by a revision check. If Pi or another browser changes the plan during an edit or drag, review the refreshed plan and try again; stale edits are never retried automatically. Pi's `update_plan` tool reads the current steps and revision before replacing the checklist, preventing stale model updates from overwriting your additions or ordering. Unfinished steps are not automatically marked done when a run stops. **The plan remains a checklist, not an execution queue:** adding or moving a step does not start a model prompt or enqueue a new task.
 
 **Export chat** downloads the visible conversation as Markdown, including fenced tool output. Use the **Export** checkboxes below assistant answers and **Export selected** to download only those answers. No hidden thinking or credentials are added to exports; visible messages and tool output can themselves contain sensitive information.
 
