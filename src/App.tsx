@@ -48,13 +48,16 @@ import {
 } from './Shared';
 import './shared.css';
 
+import { loadNavigation, saveNavigation } from './navigation';
+
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 export default function App() {
   const [config, setConfig] = useState<Config>();
   const [chats, setChats] = useState<Chat[]>([]);
-  const [active, setActive] = useState<string | null>(() => localStorage.getItem('pi-chat-active'));
+  const [initialNavigation] = useState(() => loadNavigation(window.innerWidth > 760));
+  const [active, setActive] = useState<string | null>(initialNavigation.active);
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const sharing = useShared();
   const accessRequests = sharing.listing.owned.flatMap((share) =>
@@ -64,13 +67,15 @@ export default function App() {
       sessionTitle: share.title,
     })),
   );
-  const [sidebarTab, setSidebarTab] = useState<'chats' | 'shared'>('chats');
-  const [remote, setRemote] = useState<string | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<'chats' | 'shared'>(initialNavigation.tab);
+  const [remote, setRemote] = useState<string | null>(initialNavigation.remote);
+  const restoringRemote = useRef(initialNavigation.remote);
   const [remoteRole, setRemoteRole] = useState<'reader' | 'writer'>();
   function refreshShared() {
     void sharing.refresh().catch((error) => setError(errorText(error)));
   }
   function selectRemote(id: string) {
+    restoringRemote.current = null;
     setRemote(id || null);
     setRemoteRole(undefined);
     setSidebarTab('shared');
@@ -101,7 +106,7 @@ export default function App() {
   const runningRef = useRef<Record<string, boolean>>({});
   const drafts = useRef<Record<string, string>>({});
   const mac = /Mac|iPhone|iPad/.test(navigator.platform);
-  const [sidebar, setSidebar] = useState(() => window.innerWidth > 760);
+  const [sidebar, setSidebar] = useState(initialNavigation.sidebarOpen);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -117,6 +122,22 @@ export default function App() {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
   const busy = !!snapshot?.busy || sending;
+  useEffect(() => {
+    saveNavigation({ active, remote, sidebarOpen: sidebar, tab: sidebarTab });
+  }, [active, remote, sidebar, sidebarTab]);
+  useEffect(() => {
+    const id = restoringRemote.current;
+    if (!id || !sharing.loaded) return;
+    restoringRemote.current = null;
+    if (remote === id && !sharing.listing.joined.some((share) => share.id === id)) {
+      setRemote(null);
+      setActive(null);
+    }
+  }, [sharing.loaded, sharing.listing.joined, remote]);
+  const waitingForSharedRestore =
+    !!remote &&
+    restoringRemote.current === remote &&
+    (!sharing.loaded || !sharing.listing.joined.some((share) => share.id === remote));
   async function refreshChats() {
     const list = await api<Chat[]>('/chats');
     setChats(list);
@@ -132,6 +153,12 @@ export default function App() {
         setCwd(settings.defaultCwd);
         setChats(list);
         setActive((current) => (current && list.some((c) => c.id === current) ? current : null));
+        if (
+          !initialNavigation.hasSavedTab &&
+          !initialNavigation.remote &&
+          list.some((chat) => chat.id === initialNavigation.active && chat.shared)
+        )
+          setSidebarTab('shared');
       })
       .catch((e) => !cancelled && setError(errorText(e)));
     return () => {
@@ -192,11 +219,7 @@ export default function App() {
     setSelectedResponses([]);
     setConnected(false);
     setLoading(!!active);
-    if (!active) {
-      localStorage.removeItem('pi-chat-active');
-      return;
-    }
-    localStorage.setItem('pi-chat-active', active);
+    if (!active) return;
     const source = new EventSource(`/api/chats/${active}/events`);
     source.onopen = () => setConnected(true);
     source.onmessage = (event) => {
@@ -221,6 +244,7 @@ export default function App() {
     }
   }, [draft]);
   function selectChat(id: string | null) {
+    restoringRemote.current = null;
     setRemote(null);
     setRemoteRole(undefined);
     setSidebarTab(chats.find((chat) => chat.id === id)?.shared ? 'shared' : 'chats');
@@ -439,6 +463,7 @@ export default function App() {
                 role="tab"
                 aria-selected={sidebarTab === 'chats'}
                 onClick={() => {
+                  restoringRemote.current = null;
                   setSidebarTab('chats');
                   setRemote(null);
                 }}
@@ -548,7 +573,29 @@ export default function App() {
         </>
       )}
       <main className="main-panel">
-        {remote ? (
+        {waitingForSharedRestore ? (
+          <>
+            <header className="topbar">
+              <div className="topbar-left">
+                {!sidebar && (
+                  <button
+                    className="icon-button"
+                    aria-label="Open sidebar"
+                    onClick={() => setSidebar(true)}
+                  >
+                    <Menu size={20} />
+                  </button>
+                )}
+                <span className="page-title">Shared session</span>
+              </div>
+            </header>
+            <div className="welcome" role="status">
+              {sharing.error
+                ? 'Shared sessions are unavailable. Waiting to reconnect; you can choose another chat in the sidebar.'
+                : 'Restoring shared session…'}
+            </div>
+          </>
+        ) : remote ? (
           <>
             <RemoteSharedView
               key={remote}

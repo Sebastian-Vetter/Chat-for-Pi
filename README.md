@@ -213,7 +213,7 @@ Type `/help` or choose **Web commands** in the command palette (⌘/Ctrl K) to s
 - Archive sessions without deleting history; open Session archive in the sidebar to browse or restore them. Archiving does not stop active runs or queues. The sidebar's Hide/Show session list toggle remembers your preference in this browser.
 - Model picker using providers available in your Pi configuration
 - Markdown, fenced code, tables, and copy-message controls
-- Responsive dark interface and mobile sidebar
+- Responsive dark interface and mobile sidebar. The browser remembers sidebar open/closed, the Chats/Shared tab, and the selected local or joined shared conversation across reloads and browser restarts. Settings remain saved: display/audio preferences per browser/site address, queue policy per installation. Missing conversations fall back safely; reopening never sends a prompt or automatically enables LAN sharing.
 - Workspace directory picker (enter an absolute path or `~/...`)
 - Existing Pi session browser, safe web copies, and independently running conversations
 - Sequential prompt queues with remove, pause, resume, and an installation-wide enable/disable setting (enabled by default)
