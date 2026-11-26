@@ -194,7 +194,7 @@ Terminal-only extensions, skills, prompt templates, themes, and MCP integrations
 
 ## Web commands and research subagents
 
-Click **Commands /** below the composer or type `/help` to see supported commands.
+Type `/help` or choose **Web commands** in Search (⌘/Ctrl K) to see supported commands. The composer has no dedicated commands button.
 
 - `/subagent` or `/subagent on` enables AI research delegation for this conversation. Then send a normal prompt such as “Use subagents to investigate the API and frontend independently, then summarize the risks.” Pi decides when to call the research tool; enabling it alone does not make a provider request.
 - `/subagent off` disables future delegation; `/subagent status` reports the setting. The setting survives reloads.

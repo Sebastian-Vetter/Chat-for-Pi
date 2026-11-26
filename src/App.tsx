@@ -651,9 +651,6 @@ export default function App() {
             </div>
           </form>
           <div className="composer-bottom">
-            <button type="button" className="commands-button" onClick={() => setCommandsOpen(true)}>
-              Commands /
-            </button>
             <ContextMeter snapshot={snapshot} />
             <p className="composer-disclaimer">
               Pi can edit files and run commands. Review important changes.

@@ -4,6 +4,16 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-11-26
+
+### Changed
+
+- Removed the Commands / button below the composer for a quieter interface. The command reference remains accessible through `/help` and the searchable command palette; command behavior is unchanged.
+
+### Tests
+
+- Verified the removed button stays absent and that the command reference opens from the keyboard-driven palette and `/help`.
+
 ## [1.1.3] - 2026-11-26
 
 ### Changed

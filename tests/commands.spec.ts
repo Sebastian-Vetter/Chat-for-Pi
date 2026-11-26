@@ -29,7 +29,11 @@ test('web commands are discoverable, keyboard accessible, and research progress 
     await expect(page.getByRole('region', { name: 'Research subagents' })).toContainText(
       'Inspecting entry points with read',
     );
-    await page.getByRole('button', { name: 'Commands /', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Commands /', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette', exact: true });
+    await palette.getByRole('combobox').fill('Web commands');
+    await palette.getByRole('combobox').press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Web commands' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('Terminal-only commands');
