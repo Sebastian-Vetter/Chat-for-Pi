@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Circle, Copy, Plus, RefreshCw, Users, X } from 'lucide-react';
+import { ArrowUp, Circle, Copy, Plus, RefreshCw, Trash2, Users, X } from 'lucide-react';
 import { api, type Chat, type Message } from './api';
 import SharedFiles, { sharedRequest } from './SharedFiles';
 import MessageView from './MessageView';
@@ -696,9 +696,14 @@ export function SharedSidebar({
             ))}
           </div>
           <h3>Participants</h3>
+          <p>
+            Restoring Reader or Writer lets the person reconnect without an invitation. Removing a
+            person revokes access and clears their entry; they can request access again. Past
+            messages remain.
+          </p>
           {owned.members.length ? (
             owned.members.map((member) => (
-              <label className="shared-member" key={member.id}>
+              <div className="shared-member" key={member.id}>
                 <span>
                   {member.name}
                   <small className="shared-id">{member.id}</small>
@@ -720,7 +725,28 @@ export function SharedSidebar({
                   <option value="writer">Writer</option>
                   <option value="removed">Revoked</option>
                 </select>
-              </label>
+                <button
+                  className="icon-button"
+                  aria-label={`Remove ${member.name} from session`}
+                  title="Remove person"
+                  disabled={working}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `Remove ${member.name} from this session? Their access will be revoked. They must request access again; past messages stay and already accepted work is not stopped.`,
+                      )
+                    )
+                      return;
+                    void action(async () => {
+                      await api(`/shared/sessions/${owned.id}/members/${member.id}`, {
+                        method: 'DELETE',
+                      });
+                    });
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             ))
           ) : (
             <p>No participants yet.</p>

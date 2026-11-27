@@ -11,6 +11,13 @@ interface Outgoing {
   error?: string;
   busy?: boolean;
 }
+interface Approval {
+  state: State;
+  token?: string;
+  title?: string;
+  ownerId?: string;
+  owner?: { publicKey: string };
+}
 export class SharedAccessClient {
   private entries: Outgoing[] = [];
   private polling?: Promise<void>;
@@ -68,6 +75,30 @@ export class SharedAccessClient {
       this.polling = undefined;
     }
   }
+  private accept(target: SharedTarget, result: Approval) {
+    if (
+      result.ownerId !== target.ownerId ||
+      result.owner?.publicKey !== target.owner.publicKey ||
+      typeof result.token !== 'string' ||
+      !/^[A-Za-z0-9_-]{43}$/.test(result.token) ||
+      typeof result.title !== 'string' ||
+      result.title.length > 120
+    )
+      throw new Error('Invalid owner approval');
+    return this.shared.addRemote(target, result.token, result.title);
+  }
+  async renew(id: string) {
+    const remote = this.shared.remote(id);
+    this.shared.assertKnownOwner(remote.invite);
+    const result = (await this.call(
+      remote.invite,
+      this.shared.signed(remote.invite.sessionId, ACCESS_MARKER, 'access-status', {}),
+    )) as Approval;
+    if (result?.state !== 'approved')
+      throw new Error('Access revoked; ask the host to restore your role or request access again');
+    if (this.shared.remote(id) !== remote) throw new Error('Joined session changed');
+    this.accept(remote.invite, result);
+  }
   private async check(entry: Outgoing, operation: string) {
     if (entry.busy) return;
     entry.busy = true;
@@ -76,24 +107,9 @@ export class SharedAccessClient {
       const result = (await this.call(
         entry.target,
         this.shared.signed(entry.target.sessionId, ACCESS_MARKER, operation, {}),
-      )) as {
-        state: State;
-        token?: string;
-        title?: string;
-        ownerId?: string;
-        owner?: { publicKey: string };
-      };
+      )) as Approval;
       if (result?.state === 'approved') {
-        if (
-          result.ownerId !== entry.target.ownerId ||
-          result.owner?.publicKey !== entry.target.owner.publicKey ||
-          typeof result.token !== 'string' ||
-          !/^[A-Za-z0-9_-]{43}$/.test(result.token) ||
-          typeof result.title !== 'string' ||
-          result.title.length > 120
-        )
-          throw new Error('Invalid owner approval');
-        const joined = this.shared.addRemote(entry.target, result.token, result.title);
+        const joined = this.accept(entry.target, result);
         entry.remoteId = joined.id;
       } else if (!['pending', 'denied', 'expired'].includes(result?.state))
         throw new Error('Invalid access response');

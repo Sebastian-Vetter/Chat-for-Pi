@@ -225,6 +225,17 @@ export class SharedService {
     this.save();
     return this.list();
   }
+  removeMember(id: string, memberId: string) {
+    const share = this.share(id);
+    if (!share.members.some((member) => member.id === memberId))
+      throw new Error('Participant not found');
+    share.members = share.members.filter((member) => member.id !== memberId);
+    share.requests = (share.requests ?? []).filter((request) => request.peer.id !== memberId);
+    share.invites = {};
+    this.typing.clear(id, memberId);
+    this.save();
+    return this.list();
+  }
   canWrite(id: string, actor: string, grant?: string) {
     const share = this.state.shares.find((item) => item.id === id);
     return (
@@ -491,7 +502,7 @@ export class SharedService {
       member.publicKey !== request.peer.publicKey ||
       !matches(member.tokenHash, token)
     )
-      throw new Error('Access revoked; request a new invitation');
+      throw new Error('Access revoked; ask the host to restore your role or request access again');
     this.nonces.set(nonceKey, Date.now() + 120000);
     if (member.name !== request.peer.name) {
       member.name = request.peer.name;

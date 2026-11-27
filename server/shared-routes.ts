@@ -57,6 +57,10 @@ export function sharedRoutes(shared: SharedService, network: SharedNetwork) {
       shared.member(String(req.params.id), String(req.params.memberId), req.body?.role),
     ),
   );
+  router.delete(
+    '/sessions/:id/members/:memberId',
+    route((req) => shared.removeMember(String(req.params.id), String(req.params.memberId))),
+  );
   router.get(
     '/network',
     route(() => network.status()),
@@ -123,25 +127,7 @@ export function sharedRoutes(shared: SharedService, network: SharedNetwork) {
   );
   router.post(
     '/joined/:id/rpc',
-    route((req) => {
-      const remote = shared.remote(String(req.params.id));
-      if (
-        !['snapshot', 'list', 'read', 'write', 'remove', 'message', 'typing'].includes(
-          req.body?.operation,
-        )
-      )
-        throw new Error('Unsupported shared operation');
-      return remoteCall(
-        remote.invite,
-        remote.token,
-        shared.signed(
-          remote.invite.sessionId,
-          remote.token,
-          req.body.operation,
-          req.body.data ?? {},
-        ),
-      );
-    }),
+    route((req) => network.proxy(String(req.params.id), req.body?.operation, req.body?.data ?? {})),
   );
   router.get(
     '/sessions/:id/typing',
