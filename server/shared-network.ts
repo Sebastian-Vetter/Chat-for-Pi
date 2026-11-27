@@ -130,7 +130,10 @@ export function remoteCall(
           try {
             const result = JSON.parse(Buffer.concat(chunks).toString('utf8'));
             if (response.statusCode !== 200)
-              throw new Error(result.error ?? 'Shared request rejected');
+              throw new SharedResponseError(
+                result.error ?? 'Shared request rejected',
+                response.statusCode ?? 0,
+              );
             resolve(result);
           } catch (error) {
             reject(error);
@@ -149,6 +152,15 @@ export function remoteCall(
     request.on('error', reject);
     request.end(body);
   });
+}
+
+class SharedResponseError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
 }
 
 export class SharedNetwork {
@@ -170,11 +182,51 @@ export class SharedNetwork {
       target?: Omit<SharedTarget, 'sessionId'>;
     }
   >();
+  private recovering = new Map<string, Promise<void>>();
   readonly access: SharedAccessClient;
   constructor(private shared: SharedService) {
     this.access = new SharedAccessClient(shared, (target, request) =>
       remoteCall(target, '', request, 'access'),
     );
+  }
+  async proxy(id: string, operation: string, data: Record<string, unknown>) {
+    if (!['snapshot', 'list', 'read', 'write', 'remove', 'message', 'typing'].includes(operation))
+      throw new Error('Unsupported shared operation');
+    const remote = this.shared.remote(id);
+    const invoke = (token: string) =>
+      remoteCall(
+        remote.invite,
+        token,
+        this.shared.signed(remote.invite.sessionId, token, operation, data),
+      );
+    const token = remote.token;
+    try {
+      return await invoke(token);
+    } catch (error) {
+      // Only retry read-only snapshots, never a prompt, file mutation or typing announcement.
+      if (
+        operation !== 'snapshot' ||
+        !(error instanceof SharedResponseError) ||
+        error.status !== 403 ||
+        !(
+          error.message === 'Authentication required' || error.message.startsWith('Access revoked;')
+        )
+      )
+        throw error;
+      if (remote.token === token) {
+        let pending = this.recovering.get(id);
+        if (!pending) {
+          pending = this.access.renew(id);
+          this.recovering.set(id, pending);
+        }
+        try {
+          await pending;
+        } finally {
+          if (this.recovering.get(id) === pending) this.recovering.delete(id);
+        }
+      }
+      return invoke(this.shared.remote(id).token);
+    }
   }
   async requestAccess(ownerId: string, sessionId: string) {
     const peer = this.found.get(ownerId);

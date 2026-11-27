@@ -184,6 +184,16 @@
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+.shared-member > span {
+  flex: 1;
+}
+.shared-member > select,
+.shared-member > button {
+  flex-shrink: 0;
+  width: auto;
 }
 .shared-member span,
 .network-peers span {

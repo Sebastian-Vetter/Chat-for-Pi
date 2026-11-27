@@ -4,6 +4,31 @@ All notable changes to Chat for Pi are recorded here. Versions follow [Semantic 
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-11-27
+
+### Fixed
+
+- Restore access after changing a revoked participant back to Reader or Writer. Joined views renew invalid credentials using signed installation status proofs and pinned TLS, without an invitation or another owner decision. Concurrent snapshot recovery is coalesced; only read-only snapshots retry, never prompts, file mutations or typing. Revoked/deleted participants and sharing-off sessions remain denied without automatically creating access requests.
+
+### Added
+
+- Owners can remove people from the participant list with a confirmed trash action. Removal deletes their membership/pending request, revokes old credentials and invitation links, clears typing presence, and invalidates queued writer grants. People may explicitly request access again; past messages and files remain, and already accepted work is not stopped.
+
+### Tests
+
+- Added pinned-TLS regressions for revoke/restore to Writer and Reader, concurrent recovery, no automatic prompt retry, stale queue grants, persisted deletion, old-token/link rejection and explicit re-request/readmission. Desktop/mobile tests cover role restoration, cancelled/confirmed removal and the updated participant layout.
+
+## [1.2.6] - 2026-11-26
+
+### Fixed
+
+- Remember sidebar open/closed, the Chats/Shared sidebar tab, and the last selected local or joined shared conversation across reloads and browser restarts. Preserve existing browser settings and installation-wide queue policy; migrate older saved owned-shared selections without overriding an explicitly chosen tab.
+- Validate saved navigation, tolerate damaged/unavailable browser storage, and safely clear deleted or removed selections. Wait for joined-session membership before restoring remote content, keep navigation usable during reconnection, and never overwrite a user's new selection with a late restore response.
+
+### Tests
+
+- Added desktop/mobile reload regressions for sidebar states, local/joined conversation selection, independent sidebar tabs, sound/plan/queue settings, removed conversations, delayed/cancelled shared restoration and legacy owned-shared migration. Unit coverage verifies storage validation, blocked/quota-limited storage and preservation of existing settings.
+
 ## [1.2.5] - 2026-11-26
 
 ### Added
